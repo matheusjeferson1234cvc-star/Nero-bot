@@ -1,0 +1,18 @@
+# Segredos e arquivos locais
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.log
+npm-debug.log*
+.npm/
+.cache/
+node_modules/
+# Dados de execução e backups
+/data/*
+!/data/.gitkeep
+*.bak
+# Sistemas operacionais e IDEs
+.DS_Store
+.vscode/
