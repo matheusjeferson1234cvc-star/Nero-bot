@@ -1,0 +1,56 @@
+name: Importar arquivos do Nero Bot
+
+on:
+  push:
+    paths:
+      - 'nero-bot-github-publico-100mb.zip'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  importar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Obter repositório
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Extrair o pacote público e excluir dados sensíveis
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import pathlib, zipfile
+          archive = pathlib.Path("nero-bot-github-publico-100mb.zip")
+          if not archive.is_file():
+              raise SystemExit("ZIP ausente. Envie o ZIP preparado na raiz do repositório.")
+          root = pathlib.Path(".").resolve()
+          with zipfile.ZipFile(archive) as zipf:
+              for item in zipf.infolist():
+                  rel = pathlib.PurePosixPath(item.filename)
+                  if item.is_dir():
+                      continue
+                  if rel.is_absolute() or ".." in rel.parts or "\\" in item.filename:
+                      raise ValueError(f"Caminho suspeito no ZIP: {item.filename}")
+                  if any(p in {".git", "node_modules", ".npm", ".cache", "__pycache__"} for p in rel.parts):
+                      continue
+                  if (rel.name.startswith(".env") and rel.name != ".env.example") or rel.name in {"database.json","database.json.bak"}:
+                      continue
+                  target = (root / str(rel)).resolve()
+                  if not target.is_relative_to(root):
+                      raise ValueError(f"Caminho externo no ZIP: {item.filename}")
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  target.write_bytes(zipf.read(item))
+          archive.unlink()
+          PY
+      - name: Salvar os arquivos no GitHub
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "feat: importar Nero Bot completo (RAM 100 MB)"
+            git push origin HEAD:main
+          fi
