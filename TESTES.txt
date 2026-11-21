@@ -1,0 +1,233 @@
+
+> central-de-ponto-equipes-rp@3.2.0 verify
+> npm run check && npm test
+
+
+> central-de-ponto-equipes-rp@3.2.0 check
+> node scripts/check.js
+
+✅ Verificação estática: sintaxe, estrutura, GIF, 5 botões, intents e configuração.
+
+> central-de-ponto-equipes-rp@3.2.0 test
+> node --test
+
+TAP version 13
+# Subtest: quatro turnos, cada um tem próprio canal, cargos e supervisores
+ok 1 - quatro turnos, cada um tem próprio canal, cargos e supervisores
+  ---
+  duration_ms: 2.416853
+  type: 'test'
+  ...
+# Subtest: migração de roleId antigo para lista de cargos
+ok 2 - migração de roleId antigo para lista de cargos
+  ---
+  duration_ms: 0.519424
+  type: 'test'
+  ...
+# Subtest: horário atravessando meia-noite
+ok 3 - horário atravessando meia-noite
+  ---
+  duration_ms: 18.756341
+  type: 'test'
+  ...
+# Subtest: classifica normal por cargo do turno atual
+ok 4 - classifica normal por cargo do turno atual
+  ---
+  duration_ms: 0.379333
+  type: 'test'
+  ...
+# Subtest: classifica outro turno como extra
+ok 5 - classifica outro turno como extra
+  ---
+  duration_ms: 0.161483
+  type: 'test'
+  ...
+# Subtest: quem não tem cargo de turno não aparece em nenhuma lista
+ok 6 - quem não tem cargo de turno não aparece em nenhuma lista
+  ---
+  duration_ms: 0.160682
+  type: 'test'
+  ...
+# Subtest: cargo atual prevalece quando membro tem dois turnos
+ok 7 - cargo atual prevalece quando membro tem dois turnos
+  ---
+  duration_ms: 0.254374
+  type: 'test'
+  ...
+# Subtest: equipe não pode ser criada sem convidado ou com repetição
+ok 8 - equipe não pode ser criada sem convidado ou com repetição
+  ---
+  duration_ms: 0.461337
+  type: 'test'
+  ...
+# Subtest: todos os convidados precisam aceitar
+ok 9 - todos os convidados precisam aceitar
+  ---
+  duration_ms: 0.615709
+  type: 'test'
+  ...
+# Subtest: convite recusado e expirado impedem entrada
+ok 10 - convite recusado e expirado impedem entrada
+  ---
+  duration_ms: 0.488677
+  type: 'test'
+  ...
+# Subtest: pausa e retorno não acumulam horas pausadas
+ok 11 - pausa e retorno não acumulam horas pausadas
+  ---
+  duration_ms: 0.347695
+  type: 'test'
+  ...
+# Subtest: somente líder pode encerrar e pausar
+ok 12 - somente líder pode encerrar e pausar
+  ---
+  duration_ms: 0.200092
+  type: 'test'
+  ...
+# Subtest: membro normal entra no cartão ativo sem horas retroativas
+ok 13 - membro normal entra no cartão ativo sem horas retroativas
+  ---
+  duration_ms: 0.58939
+  type: 'test'
+  ...
+# Subtest: hora extra recebe classificação e turno original
+ok 14 - hora extra recebe classificação e turno original
+  ---
+  duration_ms: 0.982653
+  type: 'test'
+  ...
+# Subtest: horas extras são separadas das horas normais no ranking
+ok 15 - horas extras são separadas das horas normais no ranking
+  ---
+  duration_ms: 0.271279
+  type: 'test'
+  ...
+# Subtest: convite de membro extra não entra se cartão estiver pausado
+ok 16 - convite de membro extra não entra se cartão estiver pausado
+  ---
+  duration_ms: 0.239111
+  type: 'test'
+  ...
+# Subtest: impede membro duplicado e equipe cheia
+ok 17 - impede membro duplicado e equipe cheia
+  ---
+  duration_ms: 0.196076
+  type: 'test'
+  ...
+# Subtest: convite de entrada vencido libera vaga
+ok 18 - convite de entrada vencido libera vaga
+  ---
+  duration_ms: 0.222957
+  type: 'test'
+  ...
+# Subtest: cancelamento individual preserva os demais
+ok 19 - cancelamento individual preserva os demais
+  ---
+  duration_ms: 0.280283
+  type: 'test'
+  ...
+# Subtest: cancelamento extra remove apenas horas extras
+ok 20 - cancelamento extra remove apenas horas extras
+  ---
+  duration_ms: 0.277539
+  type: 'test'
+  ...
+# Subtest: cancelamento de todos invalida cartão
+ok 21 - cancelamento de todos invalida cartão
+  ---
+  duration_ms: 0.123507
+  type: 'test'
+  ...
+# Subtest: não duplica cancelamento e exige motivo
+ok 22 - não duplica cancelamento e exige motivo
+  ---
+  duration_ms: 0.161503
+  type: 'test'
+  ...
+# Subtest: projeto permanece independente de outros módulos
+ok 23 - projeto permanece independente de outros módulos
+  ---
+  duration_ms: 0.073591
+  type: 'test'
+  ...
+# Subtest: após migração é possível limpar cargos do turno sem ressuscitar cargo antigo
+ok 24 - após migração é possível limpar cargos do turno sem ressuscitar cargo antigo
+  ---
+  duration_ms: 0.102435
+  type: 'test'
+  ...
+# Subtest: hora extra no cartão da tarde não altera o saldo normal do líder e sobrevive ao JSON
+ok 25 - hora extra no cartão da tarde não altera o saldo normal do líder e sobrevive ao JSON
+  ---
+  duration_ms: 0.327915
+  type: 'test'
+  ...
+# Subtest: listas separadas por cargos: extra só de turno diferente e nunca sem cargo
+ok 26 - listas separadas por cargos: extra só de turno diferente e nunca sem cargo
+  ---
+  duration_ms: 0.166982
+  type: 'test'
+  ...
+# Subtest: quem já recebeu um convite de extra não aparece em outra lista até expirar
+ok 27 - quem já recebeu um convite de extra não aparece em outra lista até expirar
+  ---
+  duration_ms: 0.137427
+  type: 'test'
+  ...
+# Subtest: cancela apenas hora extra de integrante específico sem apagar o líder
+ok 28 - cancela apenas hora extra de integrante específico sem apagar o líder
+  ---
+  duration_ms: 0.204168
+  type: 'test'
+  ...
+# Subtest: painel principal mantém GIF e cinco botões em três linhas
+ok 29 - painel principal mantém GIF e cinco botões em três linhas
+  ---
+  duration_ms: 2.452482
+  type: 'test'
+  ...
+# Subtest: cartões possuem cores por status e deixam cancelar após finalizar
+ok 30 - cartões possuem cores por status e deixam cancelar após finalizar
+  ---
+  duration_ms: 2.817593
+  type: 'test'
+  ...
+# Subtest: cartão exibe integrante normal, extras, menções e horas
+ok 31 - cartão exibe integrante normal, extras, menções e horas
+  ---
+  duration_ms: 0.441437
+  type: 'test'
+  ...
+# Subtest: convites privados são embeds normais, com aceitar/recusar e sem ping automático
+ok 32 - convites privados são embeds normais, com aceitar/recusar e sem ping automático
+  ---
+  duration_ms: 0.487196
+  type: 'test'
+  ...
+# Subtest: resposta por DM retira botões e diferencia sucesso, aviso e recusa
+ok 33 - resposta por DM retira botões e diferencia sucesso, aviso e recusa
+  ---
+  duration_ms: 0.316618
+  type: 'test'
+  ...
+# Subtest: auditoria de cancelamento destaca motivo, integrantes e cartão original
+ok 34 - auditoria de cancelamento destaca motivo, integrantes e cartão original
+  ---
+  duration_ms: 0.645694
+  type: 'test'
+  ...
+# Subtest: configuração separa turnos, equipe, auditoria e visual
+ok 35 - configuração separa turnos, equipe, auditoria e visual
+  ---
+  duration_ms: 0.400394
+  type: 'test'
+  ...
+1..35
+# tests 35
+# suites 0
+# pass 35
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 101.497675

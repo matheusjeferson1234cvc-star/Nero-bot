@@ -1,0 +1,8 @@
+ATUALIZAR NA DISCLOUD — CENTRAL DE HORAS v3.7.5
+1. Faça backup do arquivo data/database.json e data/database.json.bak da versão atual (quando existirem).
+2. Atualize o MESMO aplicativo Discloud com o ZIP; NÃO apague os arquivos de dados persistentes.
+3. Preserve as variáveis privadas DISCORD_TOKEN, CENTRAL_API_URL e BOT_SYNC_SECRET; nunca envie essas credenciais no chat.
+4. Reinicie e confira os logs da Discloud.
+5. Em seu painel do Discord, use Configurações → Ativar equipes, ou ative pelo site em Configurações → Regras do ponto.
+6. No site, configure os cargos em Turnos e cargos → Responsáveis pelo turno. Só os turnos do cargo ficam disponíveis para fiscalização com conta que não é Administrador.
+7. Teste com um responsável de um turno e depois com um Administrador.

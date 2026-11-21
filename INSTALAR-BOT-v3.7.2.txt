@@ -1,0 +1,13 @@
+BOT CENTRAL DE PONTO v3.7.2 — DISCLOUD
+
+Este ZIP contém o bot completo, incluindo os assets de imagens.
+Atualize na Discloud preservando o arquivo privado de dados e as variáveis
+DISCORD_TOKEN, CENTRAL_API_URL e BOT_SYNC_SECRET existentes.
+
+A edição do painel de justificativas pelo site exige que você atualize
+o SITE e a API para 5.8.4 no GitHub/Vercel.
+O bot recebe bot_config do site ~uma vez por minuto e atualiza os painéis
+que já foram publicados. O primeiro painel é publicado no Discord com
+/paineljustificativas ou /painelbateponto.
+
+Não envie tokens reais nem o banco database.json em chats ou repositórios.

@@ -1,0 +1,33 @@
+CENTRAL DE PONTO v3.6.2 — MENUS E COMPROVANTE REAL NO PV
+==========================================================
+
+ATUALIZAÇÃO SOMENTE DO BOT / DISCLOUD. Não altera o site.
+
+CORREÇÕES
+- Mantidos /painelbateponto e /paineljustificativas. Os dois painéis salvos são atualizados automaticamente ao iniciar o bot.
+- Configurações de justificativas e advertências agora ficam no painel de justificativas (botão Configurações, restrito à administração).
+- Configurações de turnos, modo de ponto, equipe, notificações e auditoria continuam no painel de bate-ponto.
+- Botões com emojis discretos e retorno ao menu anterior.
+- Comprovante digital em PNG no privado, anexado ao encerramento do ponto. Corrigida a função que faltava exportar e impedia o envio da imagem.
+- Foto: tenta avatar do servidor, depois avatar global, depois avatar padrão; na falta de acesso, mostra as iniciais.
+- O horário de início vem do registro do próprio participante (ou do primeiro segmento do ponto); o encerramento vem do cartão finalizado. Horas válidas não contam pausas.
+- Se o envio da imagem falhar, usa o embed textual e registra o motivo nos logs.
+- Regras existentes de ponto normal, convites, horas extras, cargos de turno e sincronização com site preservadas.
+
+INSTALAÇÃO
+1. Faça BACKUP de data/database.json e de data/database.json.bak se existirem na Discloud.
+2. Atualize os arquivos do bot e preserve os dados persistidos. Não envie seu arquivo .env publicamente.
+3. Mantenha as variáveis já configuradas: DISCORD_TOKEN, CENTRAL_API_URL, BOT_SYNC_SECRET.
+4. Reinicie a aplicação. O bot atualizará automaticamente os painéis registrados em seu banco.
+5. No Discord, no painel de bate-ponto, abra Configurações > Notificações e PV; confirme PV e Comprovante em imagem ativados.
+6. Abra o painel de justificativas e toque em Configurações para ajustar análise, logs e três níveis de advertência.
+7. Inicie um novo ponto de TESTE, pause e retorne, depois encerre. Confira o PV e os logs da Discloud.
+
+LIMITAÇÕES
+- O bot não edita mensagens enviadas por outro aplicativo; o registro original precisa ser uma mensagem do próprio bot.
+- O destinatário deve permitir receber mensagens privadas do bot.
+- Se o Discord/CDN bloquear a foto, o comprovante continua disponível, usando iniciais.
+- Os testes locais verificam a lógica e a geração PNG, mas não substituem testes de ponta a ponta na Discloud.
+- Advertências automáticas dependem da autorização do site já configurado e permanecem restritas às regras existentes.
+
+TESTES LOCAIS: npm test (59 passaram); npm run check (passou).

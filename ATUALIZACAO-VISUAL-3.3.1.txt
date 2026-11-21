@@ -1,0 +1,20 @@
+CENTRAL DE PONTO v3.3.1 — ATUALIZAÇÃO VISUAL
+
+O que mudou:
+- Cartões de ponto e auditoria com layout mais limpo, cores por status e menos emojis.
+- Convites privados com dados organizados e botões preservados.
+- Mensagens de resposta no privado mais concisas.
+- Mesmas regras de equipes, turnos, horas normais/extras, sincronização e persistência.
+- Verificação local: npm run verify (36 testes aprovados).
+
+IMPORTANTE: Esta é uma atualização visual. Ela NÃO implementa ainda o painel
+separado de justificativas, folgas, níveis de advertência ou alterações no site.
+
+ANTES DE PUBLICAR NA DISCLOUD:
+1. Guarde uma cópia do bot atual e faça backup do banco de dados persistente.
+2. Atualize os arquivos do código sem apagar os dados do bot.
+3. Mantenha suas variáveis privadas/secretas na Discloud; não inclua .env no ZIP.
+4. Teste em um servidor de testes antes de substituir a aplicação em produção.
+5. Confira o funcionamento de bater ponto, pausar, encerrar, horas extras e sincronização.
+
+Não há alterações automáticas na Discloud nem na Vercel.

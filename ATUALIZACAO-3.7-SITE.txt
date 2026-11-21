@@ -1,0 +1,18 @@
+CENTRAL DE PONTO v3.7 — CONFIGURAÇÃO PELO SITE
+
+- O bot passa a receber cargos, canais, regras, turnos, visual e avisos de
+  Central de Horas v5.8 após a sincronização do site (aprox. 60 segundos).
+- O painel publicado é atualizado automaticamente se seu visual mudar.
+- A revisão da configuração é confirmada à API; problemas temporários na
+  confirmação são tentados novamente no ciclo seguinte.
+- Os registros, cartões, presença, advertências e IDs das mensagens
+  publicadas são preservados no arquivo de dados.
+
+INSTALAÇÃO: execute o SQL v5.8 e publique site+API primeiro, depois este bot.
+Nunca substitua/limpe o arquivo de dados persistentes do bot.
+No Discloud, configurar CENTRAL_API_URL e BOT_SYNC_SECRET no ambiente.
+Não envie tokens ou segredos ao GitHub nem a conversas.
+
+RESTRIÇÕES: publicar o PRIMEIRO painel ainda utiliza comando Discord.
+Os cargos e canais devem existir no servidor. A configuração feita pelo site
+passa a ter preferência quando sincronizada com o bot.

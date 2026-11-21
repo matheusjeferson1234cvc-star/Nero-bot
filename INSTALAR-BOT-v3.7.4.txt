@@ -1,0 +1,10 @@
+CENTRAL DE PONTO v3.7.4 — CONVITES PELO SERVIDOR
+
+1. Faça backup de data/database.json e data/database.json.bak (se existirem).
+2. Atualize o mesmo aplicativo na Discloud com este ZIP. Preserve variáveis de ambiente privadas.
+3. Reinicie, verifique logs e confirme que o painel de bate-ponto exibiu Meus convites. Se necessário, republique /painelbateponto no mesmo canal.
+4. Um líder cria uma equipe, convida outro integrante e ele clica Meus convites > Aceitar no canal do painel.
+5. Repita com PV bloqueado e com hora extra, verificando logs e horas no site.
+
+O PV continua opcional. Não é necessário habilitar mensagens privadas para aceitar convites.
+Não apague o banco de dados atual.

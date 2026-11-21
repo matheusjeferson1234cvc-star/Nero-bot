@@ -1,0 +1,14 @@
+CENTRAL DE PONTO v3.0
+
+1) Discord Developer Portal > Bot > ativar Server Members Intent
+2) Colocar bot no servidor com permissões de canais e Gerenciar cargos
+3) Node.js 22.12+: npm install
+4) Criar .env privado com DISCORD_TOKEN=...
+5) npm run verify
+6) npm start
+7) Publicar /painelbateponto
+8) Painel > Configurações: cargos, horários, responsáveis, logs e auditoria
+
+Nenhuma credencial real está no ZIP.
+Se o build Discloud falhar com node:undefined, isso acontece antes do JS do bot.
+Leia README.md e CONFIGURACOES.md.

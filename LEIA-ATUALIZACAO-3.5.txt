@@ -1,0 +1,68 @@
+CENTRAL DE HORAS — ATUALIZAÇÃO 5.4 (SITE) + 3.5 (BOT)
+======================================================
+
+O QUE MUDOU NESTA REVISÃO
+- Administradores do Discord com a permissão real ADMINISTRADOR podem consultar o site mesmo sem terem sido selecionados manualmente na lista de cargos autorizados.
+- O dono do servidor continua podendo selecionar cargos extras de LEITURA na aba Permissões do site.
+- Somente o dono do servidor edita permissões e folgas; administradores consultam os dados.
+- O dono do sistema continua identificado por BOT_OWNER_DISCORD_ID, com acesso de consulta aos servidores sincronizados.
+- Justificativas: opção separada de canal de análise, CANAL DE LOGS de decisões e canal de advertências no menu do bot.
+- Quando a justificativa é aprovada ou recusada, o bot tenta enviar a decisão imediatamente ao site, além da sincronização periódica.
+- Aprovada = falta abonada e excluída das advertências; pendente = bloqueia advertência enquanto aguardando; recusada = não abona falta.
+- Ponto normal, cargos dos turnos, classificação de horas extras e registros anteriores preservados.
+
+1) BACKUP
+Na Discloud, antes de substituir o bot, faça backup de data/database.json e data/database.json.bak (se existir). Não coloque o banco antigo no GitHub.
+
+2) SUPABASE
+Se o banco já está funcionando, NÃO apague tabelas nem faça reset. Para instalação nova, execute supabase.sql no SQL Editor; as alterações são idempotentes.
+
+3) GITHUB + VERCEL PELO CELULAR
+A) Extraia SITE-RAIZ-GITHUB.zip. Envie todos os arquivos para a RAIZ do mesmo repositório GitHub conectado ao projeto central-de-horas1.
+B) Entre na pasta api do repositório e envie os arquivos do pacote API-GITHUB.zip. O nome da pasta TEM QUE SER api; não misture arquivos de api com index.html.
+C) Na pasta api, exclua time-off.js se ele ainda existir (a função de folgas é atendida pelo index.js, com rewrite no vercel.json). A pasta api tem exatamente 12 funções JS nesta versão, compatível com o limite Hobby apresentado no seu print.
+D) Mantenha vercel.json na raiz. Aguarde a Vercel concluir com Ready em Production.
+E) Na Vercel > Settings > Environment Variables, confirme apenas os NOMES (sem compartilhar valores):
+   SUPABASE_URL
+   SUPABASE_SECRET_KEY (ou SUPABASE_SERVICE_ROLE_KEY)
+   DISCORD_CLIENT_ID
+   DISCORD_CLIENT_SECRET
+   DISCORD_REDIRECT_URI=https://central-de-horas1.vercel.app/api/callback
+   SESSION_SECRET
+   DISCORD_BOT_TOKEN           <-- O token do mesmo bot da Discloud, guardado SOMENTE como variável PRIVADA na Vercel
+   BOT_SYNC_SECRET            <-- Mesmo valor configurado na Discloud
+   BOT_OWNER_DISCORD_ID       <-- ID da sua CONTA pessoal, não do bot
+F) Cadastre o mesmo redirect em Discord Developer Portal > OAuth2 > Redirects. Reimplante a produção após atualizar variáveis.
+G) Verifique https://central-de-horas1.vercel.app/api/health . Deve retornar version 5.4.0 e discordBot true. O endpoint health não divulga tokens.
+
+4) DISCLOUD
+Envie o ZIP BOT-DISCLOUD.zip para substituir o código do bot, mantendo data/database.json no armazenamento persistente. Mantenha as variáveis privadas:
+   DISCORD_TOKEN
+   CENTRAL_API_URL=https://central-de-horas1.vercel.app
+   BOT_SYNC_SECRET
+Ative Server Members Intent no Discord Developer Portal. Não envie tokens pelo chat nem para o GitHub.
+
+5) COMANDOS
+/painelbateponto: publicar o painel de bate-ponto.
+/paineljustificativas: publicar painel dark de justificativas, com GIF de letras.
+/fiscalizarponto: fiscalização autorizada.
+/testepresenca: simulação para dono do bot/administrador (não aplica cargos e não envia punições).
+
+6) CONFIGURAÇÕES DE JUSTIFICATIVAS
+No botão Configurações > Justificativas:
+  - Canal de análise (recebe os pedidos com Aprovar / Recusar)
+  - Logs de justificativas (recebe registro de cada decisão; padrão: canal de análise se não definido)
+  - Canal de advertências
+  - Advertências: três cargos diferentes, um por nível. Ao subir de nível, remove o cargo anterior.
+Os canais que exibem motivos de ausência devem ser PRIVADOS e acessíveis somente à equipe autorizada.
+As advertências automáticas começam DESLIGADAS. Só ative após configurar cargos, folgas, analisar as faltas e testar sem efeitos.
+
+7) TESTE DE ACEITAÇÃO
+- Inicie ponto em equipe e encerre. Confira comprovante de imagem no PV e dados no site.
+- Envie uma justificativa para um dia de teste, aprove/recuse, confira log + PV + status no site.
+- Crie dois dias de falta SOMENTE num ambiente de teste e use /testepresenca; confirme que não ocorre punição no modo de simulação.
+- Verifique login de um cargo ADMINISTRADOR do Discord no site. Quem não tem cargo autorizado não deve enxergar os dados.
+- Verifique o histórico de folgas, horas normais/extras e os cargos de turno originais.
+
+TESTES LOCAIS
+48 testes do bot e 36 testes do site passaram. npm run check do bot passou. Não foi possível executar fluxos reais nas contas do Discord, Discloud, Vercel ou Supabase a partir deste ambiente. Não afirmar que os servidores foram atualizados até publicar e testar.

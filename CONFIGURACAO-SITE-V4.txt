@@ -1,0 +1,11 @@
+BOT CENTRAL DE PONTO - DISCLOUD
+
+Este pacote preserva as correções dos convites entre turnos e a sincronização com o site.
+Configure nas variáveis privadas da Discloud:
+DISCORD_TOKEN = token atual do bot
+CENTRAL_API_URL = https://central-de-horas1.vercel.app
+BOT_SYNC_SECRET = mesmo segredo longo definido na Vercel
+
+No site Vercel, DISCORD_BOT_TOKEN recebe o mesmo token do bot.
+Não cole tokens em arquivos públicos.
+A sincronização exige que o site atualizado esteja implantado e o Supabase configurado.

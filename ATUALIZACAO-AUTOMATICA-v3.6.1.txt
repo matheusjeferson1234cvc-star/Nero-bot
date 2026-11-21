@@ -1,0 +1,29 @@
+CENTRAL DE PONTO v3.6.1 — ATUALIZAÇÃO AUTOMÁTICA DOS PAINÉIS
+
+O QUE MUDA
+- O bot atualiza sozinho os painéis de bate-ponto e justificativas quando inicia.
+- Não existe mais o comando /atualizarpainel.
+- Se a mensagem foi apagada, recria uma mensagem no canal registrado e salva o novo ID.
+- Se o painel antigo é de outro aplicativo, publica uma nova mensagem própria sem mexer na mensagem alheia.
+- Se um administrador tentar publicar no mesmo canal novamente, reutiliza a mensagem cadastrada sem duplicar.
+- Personalização e mudança de modo seguem atualizando o painel automaticamente.
+- Preserva horas, registros, turnos, horas extras, convites e integração com a Central de Horas.
+- Não há qualquer alteração nos arquivos do site ou da Vercel.
+
+ATENÇÃO
+- Para saber onde atualizar, o bot precisa ter o registro do canal/mensagem em data/database.json.
+- Se o painel nunca foi publicado por esse bot com os dados atuais, é necessário fazer a PRIMEIRA publicação uma vez com /painelbateponto ou /paineljustificativas. Depois, todas as atualizações de versão são automáticas.
+- O Discord não permite editar mensagens de outro aplicativo. Nesse caso o novo painel será publicado no canal registrado; exclua o antigo manualmente caso queira.
+- Se o bot não tiver permissão para ver canais, buscar mensagens, enviar mensagens ou anexar arquivos, confira as permissões antes de reiniciar.
+
+ATUALIZAR NA DISCLOUD
+1. Faça cópia de segurança de data/database.json e data/database.json.bak.
+2. Substitua os arquivos do bot pelo conteúdo deste ZIP (na raiz da aplicação).
+3. Mantenha as variáveis DISCORD_TOKEN, CENTRAL_API_URL e BOT_SYNC_SECRET no painel da Discloud.
+4. Reinicie a aplicação e aguarde a confirmação de conexão ao Discord.
+5. Nos logs, procure [Painel bate-ponto] e [Painel justificativas], com status updated, recreated ou replaced-foreign.
+6. Confira os painéis no Discord. Nenhum comando de atualização é necessário.
+
+TESTES
+- npm run verify: estrutura e 53 testes locais aprovados.
+- A atualização efetiva das mensagens na Discloud depende de acesso e permissões reais no Discord e não foi testada em servidor real daqui.

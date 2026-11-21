@@ -1,0 +1,14 @@
+CENTRAL DE PONTO v3.6.1 — CORREÇÃO DO VISUAL E COMPROVANTE NO PV
+
+1) O painel principal usa título, seção de jornada e botões organizados, além do banner dark.
+2) SEM COMANDO PARA ATUALIZAR: ao iniciar, o bot atualiza automaticamente os painéis de bate-ponto e justificativas cadastrados, no mesmo canal.
+   Se a mensagem cadastrada tiver sido apagada, o bot publica uma nova e memoriza o ID para não duplicar.
+   Se a mensagem for de OUTRO aplicativo, ela não pode ser editada; o bot publica uma mensagem própria no canal salvo. Exclua o painel antigo de outro aplicativo manualmente se desejar.
+   Se nunca houve painel cadastrado neste banco, é necessário publicar UMA VEZ com /painelbateponto ou /paineljustificativas para definir o canal.
+3) Em Configurações > Notificações e PV, confirme Comprovante no privado = Ativado e Comprovante em imagem PNG = Ativado.
+4) O comprovante de encerramento agora é vertical, com membro, equipe, horários, tipo da hora, duração e pausas. Tenta usar o avatar do Discord e funciona sem ele.
+5) Configurações e escolha de convidados estão mais legíveis.
+6) Os cargos de turno, formas de convite, regras de hora extra, registros e sincronização ficam preservados.
+7) MANTENHA data/database.json e data/database.json.bak em backup. Não sobrescreva o banco existente.
+8) O bot não edita mensagens de outros aplicativos, mesmo que estejam no mesmo canal.
+9) Bot e site precisam ser publicados separadamente; não houve acesso remoto para implantação.

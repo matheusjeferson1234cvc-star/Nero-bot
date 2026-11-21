@@ -1,0 +1,38 @@
+CENTRAL DE HORAS v5.8.1 + BOT v3.7.1
+CORREÇÃO DE DATA E DE IMAGEM DE COMPROVANTE NO PV
+
+PRÉ-REQUISITO: o site/API v5.8 e o bot v3.7 já instalados.
+
+1. Faça uma cópia de segurança dos dados persistentes do bot e do Supabase.
+   Não apague o diretório de dados do bot (DATA_DIR) nem o projeto Supabase.
+2. GITHUB / VERCEL (site):
+   - Extraia CENTRAL-DE-HORAS-v5.8.1-SITE-CORRECAO.zip.
+   - Substitua SOMENTE o arquivo real.js na RAIZ do repositório.
+   - Aguarde a Vercel publicar e recarregue a página.
+   - Não é necessário modificar a pasta api ou o banco.
+3. DISCLOUD (bot):
+   - Atualize o bot com CENTRAL-DE-PONTO-v3.7.1-DISCLOUD.zip.
+   - Preserve as variáveis de ambiente, os dados e o histórico.
+   - O código inclui os arquivos src/date-br.js, receipt-dm.js,
+     receipt-png-fallback.js e receipt-time.js.
+4. TESTE NO DISCORD:
+   - Use /testarcomprovante no servidor (dono/admin).
+   - Confira se chegou uma imagem PNG em suas mensagens privadas.
+   - Esse comando NÃO registra ponto nem modifica horas.
+5. Se o PNG não chegar:
+   - Ative as mensagens privadas do Discord para o servidor.
+   - Verifique no site Configurar bot > Avisos se
+     'Enviar mensagens privadas de ponto' e
+     'Enviar comprovante com imagem' estão marcados.
+   - Veja os logs do bot na Discloud por mensagens [Comprovante].
+   - Caso o Discord retorne o erro 50007, as DMs estão bloqueadas
+     ou o usuário não pode recebê-las; o bot não pode forçar o envio.
+6. JUSTIFICATIVAS: digite DD/MM/AAAA (por exemplo 07/11/2026),
+   incluindo as barras / . O formulário do Discord não insere
+   as barras automaticamente; a validação exige esse formato.
+
+ATENÇÃO: Não rode novamente SQL desnecessariamente. Nenhuma das
+correções desta versão exige novas tabelas nem colunas.
+
+TESTES: `npm test` passou no código local. O envio com o Discord real
+não foi executado neste ambiente: precisa do teste /testarcomprovante.

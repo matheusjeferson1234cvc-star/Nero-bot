@@ -1,0 +1,6 @@
+ATUALIZACAO DE RAM PARA DISCLOUD
+No arquivo discloud.config, RAM=512 foi alterado para RAM=100.
+Isto define o limite de memoria da hospedagem, nao o consumo real do bot.
+100 MB pode ser insuficiente para um bot discord.js com muitos servidores e membros.
+Se o bot reiniciar, der erro de memoria ou ficar offline, eleve a RAM ou otimize o codigo.
+Este backup nao foi implantado automaticamente. Confira a aplicacao na Discloud apos publicar.

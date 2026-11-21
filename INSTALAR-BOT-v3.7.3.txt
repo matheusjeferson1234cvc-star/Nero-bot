@@ -1,0 +1,18 @@
+CENTRAL DE HORAS — BOT v3.7.3 (COMPROVANTE SEM IMAGEM)
+
+Mudanças:
+- Ao encerrar um ponto, o bot envia um EMBED no PV do membro com equipe, turno, tipo de hora, início, fim, tempo válido e pausas.
+- Não envia imagem PNG nem anexos, mesmo que a opção antiga estivesse ativada.
+- Mensagem inclui botão Abrir Central de Horas, que leva a https://central-de-horas1.vercel.app/
+- No menu Configurações > Notificações e PV, só permanece Ativar/Desativar mensagens no PV.
+- /testarcomprovante agora testa a mensagem, sem gerar horas.
+- Quando o membro bloqueia PV, o cartão continua encerrando sem erro e o bot registra aviso no log.
+
+ATUALIZAR NA DISCLOUD:
+1. Faça backup dos seus dados persistentes em data/database.json e data/database.json.bak, se existirem.
+2. Atualize o bot usando este ZIP v3.7.3 no aplicativo existente; mantenha as variáveis DISCORD_TOKEN, CENTRAL_API_URL e BOT_SYNC_SECRET.
+3. Reinicie o aplicativo e confira os logs, principalmente se uma configuração remota foi recebida.
+4. No Discord execute /testarcomprovante em servidor administrado para receber um teste no PV (sem contar horas).
+5. Feche um cartão de teste para validar o envio real e conferir logs/relatórios no site.
+
+O site e Supabase não precisam ser apagados ou recriados. Esta mudança do PV entra em vigor somente quando o bot da Discloud for atualizado.

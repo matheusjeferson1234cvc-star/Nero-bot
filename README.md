@@ -1,15 +1,7 @@
-# Nero Bot — Central de Horas
+# CENTRAL DE HORAS — Bot v3.7.5
 
-Repositório público do bot Discord **Nero Bot**.
+Bot Discord.js de ponto por turnos, com equipes opcionais, PV por mensagem, convites no próprio servidor e painel web na Vercel.
 
-## Situação da importação
-O repositório foi preparado para importar o pacote `nero-bot-github-publico-100mb.zip`. **O código completo só aparecerá aqui depois que esse ZIP for enviado ao repositório**.
+Novidade: ativação clara de equipes (sincroniza com site) e atualização antecipada do site depois de operações de ponto, com debounce para evitar envios excessivos.
 
-## Importar os arquivos
-1. Clique em **Add file → Upload files** no GitHub.
-2. Envie o arquivo `nero-bot-github-publico-100mb.zip` preparado para publicação.
-3. Clique em **Commit changes** e acompanhe a aba **Actions**: a automação `Importar arquivos do Nero Bot` extrairá o ZIP e adicionará os arquivos à raiz, preservando as pastas.
-
-Não envie arquivos `.env`, tokens, bancos de dados ou históricos de usuários.
-
-A configuração solicitada para Discloud no pacote é `RAM=100`. Isso é apenas o limite configurado: não garante que o consumo real do bot seja menor que 100 MB.
+A proteção por turno é aplicada pelo servidor da API da Vercel, e não apenas pela tela. Veja INSTALAR-BOT-v3.7.5.txt.

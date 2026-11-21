@@ -1,0 +1,17 @@
+BOT RP v5.0 — ORGANIZAÇÃO E POLÍCIA
+
+Comandos: /painelregistro, /painelrecrutamento, /painelgestao, /painelbateponto
+
+1. Configure o DISCORD_TOKEN em ambiente privado da hospedagem.
+2. Instale as dependências com npm install e execute npm start.
+3. Convide o bot com bot + applications.commands e permissões adequadas.
+4. Publique os 4 painéis com os comandos acima, selecionando Organização/Polícia.
+5. Em CADA painel, clique ⚙️ Configurar para configurar exclusivamente esse painel.
+6. Configure cargos antes de operar: turnos do Registro; análises/aprovação do
+   Recrutamento; patentes/advertências/canais de Gestão; cargo Em serviço no Ponto.
+7. Teste cada formulário e convite em servidor de testes antes de usar na comunidade.
+
+IMPORTANTE: o pacote não contém token. O problema Discloud node:undefined
+continua dependendo de validação na própria hospedagem.
+
+Leia README.md para instruções e limitações completas.
