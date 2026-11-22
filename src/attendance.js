@@ -33,10 +33,10 @@ function timeOff(off,date,shift){const weekly=off?.weekly||{all:[0]};const d=wee
  return (off?.dates||[]).some(item=>item.date===date&&(item.shift==='all'||item.shift===shift));
 }
 function sameDayReason(g,userId,date,shift){return Object.values(g.justifications||{}).find(j=>j.userId===userId&&(j.date===date||j.dates?.includes(date))&&j.shift===shift&&['pending','approved'].includes(j.status));}
-function requestedDates(start,days){
+function requestedDates(start,days,off=null,shift=null){
  if(!/^\d{4}-\d{2}-\d{2}$/.test(start)||!Number.isInteger(days)||days<1||days>60)throw Error('Período inválido. Escolha de 1 a 60 dias.');
  const dates=[];let date=start;
- while(dates.length<days){if(weekday(date)!==0)dates.push(date);date=plusDays(date,1);}
+ while(dates.length<days){if(weekday(date)!==0&&!(off&&shift&&timeOff(off,date,shift)))dates.push(date);date=plusDays(date,1);}
  return dates;
 }
 function evaluation(g,{date,shift,userId,off,tz}){
