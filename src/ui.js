@@ -26,7 +26,8 @@ const timestamp = value => value ? `<t:${Math.floor(value / 1000)}:f>` : '—';
 const shiftLabel = shift => core.SHIFTS[shift] || '🕒 Turno não definido';
 
 function button(id, label, style = ButtonStyle.Secondary, emoji) {
-  const b = new ButtonBuilder().setCustomId(id).setLabel(label).setStyle(style);
+  const b = new ButtonBuilder().setCustomId(id).setStyle(style);
+   if(label)b.setLabel(label);
   if (emoji) b.setEmoji(emoji);
   return b;
 }
@@ -90,10 +91,10 @@ function panel(p, mode = 'team') {
       button('bp:invites', 'Meus convites', ButtonStyle.Primary, '📨')] : [])
   ));
   container.addActionRowComponents(row(
-    button('bp:ranking', 'Ranking', ButtonStyle.Secondary, '🏆'),
-    button('bp:config', 'Configurações', ButtonStyle.Secondary, '⚙️')
+    button('bp:ranking', '', ButtonStyle.Secondary, '🏆'),
+    button('bp:config', '', ButtonStyle.Secondary, '⚙️')
   ));
-  container.addTextDisplayComponents(text('-# CENTRAL DE PONTO • Convites podem ser aceitos aqui pelo servidor, sem PV. Horas sincronizadas com a Central de Horas.'));
+  container.addTextDisplayComponents(text(`-# CENTRAL DE PONTO • ${isTeam?'Convites de equipe podem ser aceitos neste servidor.':'Modo individual ativo.'} Horas sincronizadas com a Central de Horas.`));
   return {
     components: [container], flags: MessageFlags.IsComponentsV2,
     allowedMentions: mentions,
@@ -115,9 +116,7 @@ const statusTone = Object.freeze({
 function memberLine(m, card, now = Date.now()) {
   const who = `<@${m.userId}>`;
   const leader = m.userId === card.leaderId ? ' · Líder' : '';
-  const type = m.type === 'extra'
-    ? `Hora extra · Origem: ${shiftLabel(m.originShift)}`
-    : 'Horas normais';
+  const type = 'Horas registradas';
   if (m.invalidation) return `• ${who}${leader} — **Horas invalidadas**\n  ${type}`;
   if (card.status === 'pending') return `• ${who}${leader} — ${m.accepted ? 'Convite aceito' : 'Aguardando aceite'}\n  ${type}`;
   return `• ${who}${leader} — **${core.format(core.durationFor(m, now))}**\n  ${type}`;
@@ -136,7 +135,7 @@ function cardText(card, now = Date.now()) {
     members || '_Nenhum integrante_',
     '',
     '**Total de horas da equipe**',
-    `**Normais:** ${core.format(totals.normal)}  |  **Extras:** ${core.format(totals.extra)}`,
+    `**Total:** ${core.format(totals.normal)}`,
     `**Início:** ${timestamp(card.startedAt)}`,
     `**Encerramento:** ${timestamp(card.endedAt)}`,
     `-# ${(card.history || []).length} evento(s) registrado(s) · Horas individuais preservadas no histórico.`
@@ -156,7 +155,7 @@ function logCard(card) {
 }
 function auditLog(entry, card = null, guildId = null) {
   const cancel = /cancelamento de horas/i.test(entry.type);
-  const success = /Entrada|Retorno|aceitou|Hora extra/i.test(entry.type);
+  const success = /Entrada|Retorno|aceitou/i.test(entry.type);
   const container = new ContainerBuilder().setAccentColor(
     cancel ? COLORS.red : success ? COLORS.green : COLORS.blue
   );
@@ -172,7 +171,7 @@ function auditLog(entry, card = null, guildId = null) {
   ].filter(Boolean).join('\n')));
   if (entry.affected?.length) container.addTextDisplayComponents(text(
     '**Horas invalidadas**\n' + entry.affected.map(a =>
-      `• <@${a.userId}> — **${core.format(a.ms)}** · ${a.type === 'extra' ? `Hora extra (${shiftLabel(a.originShift)})` : 'Horas normais'}`
+      `• <@${a.userId}> — **${core.format(a.ms)}** · Horas registradas`
     ).join('\n').slice(0, 3500)
   ));
   if (entry.reason) container.addTextDisplayComponents(text(
@@ -183,10 +182,9 @@ function auditLog(entry, card = null, guildId = null) {
 }
 function inviteDM(card, guildId, targetId, kind = 'initial', classification) {
   const joining = kind !== 'initial';
-  const extra = classification?.type === 'extra';
-  const who = extra ? `Hora extra · Turno de origem: ${shiftLabel(classification.originShift)}` : 'Horas normais do turno';
+  const who = 'Horas do turno';
   const embed = new EmbedBuilder()
-    .setColor(extra ? COLORS.purple : COLORS.blue)
+    .setColor(COLORS.blue)
     .setTitle(joining ? 'Convite • Entrar na equipe' : 'Convite • Novo ponto em equipe')
     .setDescription('Confira seu turno, a modalidade das horas e o responsável antes de confirmar. O convite é pessoal.')
     .addFields(
@@ -255,11 +253,13 @@ function config(settings) {
     `### Segurança e registro\n` +
     `**Fuso horário:** ${safe(settings.timezone)}\n` +
     `**Cargo em serviço:** ${settings.serviceRoleId ? `<@&${settings.serviceRoleId}>` : 'Não configurado'}\n` +
-    `**Auditoria:** ${settings.auditChannelId ? `<#${settings.auditChannelId}>` : 'Não configurada'}\n\n` +
+    `**Auditoria:** ${settings.auditChannelId ? `<#${settings.auditChannelId}>` : 'Não configurada'}\n` +
+     `**📋 Logs de presença:** ${settings.presenceLogChannelId ? `<#${settings.presenceLogChannelId}>` : 'Não configurado'} · ${settings.presenceReportsEnabled?'Ativado':'Desativado'}\n\n` +
     `-# Justificativas e advertências são configuradas no painel /paineljustificativas. Fiscalização: /fiscalizarponto.`,
     [row(button('cfg:shifts', 'Turnos e cargos', ButtonStyle.Primary, '🕒'), button('cfg:mode', 'Ativar equipes', ButtonStyle.Secondary, '👥')),
       row(button('cfg:rules', 'Equipe e convites', ButtonStyle.Secondary, '📨'), button('cfg:service', 'Cargo em serviço', ButtonStyle.Secondary, '🏷️')),
       row(button('cfg:notify', 'Notificações e PV', ButtonStyle.Secondary, '🔔'), button('cfg:audit', 'Auditoria', ButtonStyle.Secondary, '🛡️')),
+       row(button('cfg:presence','Logs de presença',ButtonStyle.Primary,'📋')),
       row(button('cfg:visual', 'Aparência e banner', ButtonStyle.Secondary, '🎨'))],
     true, 'purple');
 }
@@ -270,10 +270,9 @@ function teamMenu(c) {
     `**🕒 Turno:** ${shiftLabel(c.shift)}\n` +
     `**📡 Situação:** ${stat[c.status]}\n` +
     `**👥 Integrantes:** ${c.members.length}  ·  **Vagas:** ${spaces}\n\n` +
-    `**👤 Membro do turno:** horas normais, apenas com cargo deste turno.\n` +
-    `**⏱️ Hora extra:** apenas com cargo de outro turno configurado.\n\n` +
+    `**👤 Membros:** apenas pessoas com cargo deste turno.\n\n` +
     '-# A contagem começa somente depois que a pessoa aceitar o convite.',
-    [row(button(`team:normal:${c.id}`, 'Membro do turno', ButtonStyle.Primary, '👤'), button(`team:extra:${c.id}`, 'Hora extra', ButtonStyle.Secondary, '⏱️')),
+    [row(button(`team:normal:${c.id}`, 'Adicionar membro', ButtonStyle.Primary, '👤')),
       row(button(`team:members:${c.id}`, 'Ver integrantes', ButtonStyle.Secondary, '👥'))], true, 'cyan');
 }
 function pagerOptions(candidates, page) {
@@ -295,7 +294,7 @@ function candidateView(session) {
   return v2(session.kind === 'draft' ? 'EQUIPE • ESCOLHER CONVIDADOS' : 'EQUIPE • ADICIONAR MEMBRO',
     `${session.draft?.name ? `**Equipe:** ${safe(session.draft.name)}\n` : ''}` +
     `**Turno:** ${shiftLabel(session.shift)}\n` +
-    `**Tipo:** ${session.type === 'extra' ? 'Hora extra — membros de outros turnos' : 'Normal — apenas membros deste turno'}\n` +
+    `**Tipo:** Integrantes do próprio turno\n` +
     `**Disponíveis:** ${session.candidates.length} · **Página:** ${session.page + 1}/${pages}\n` +
     (session.search ? `**Busca:** ${safe(session.search)}\n` : '') +
     `\n### Selecionados (${chosen})\n${summary}\n\n` +
@@ -303,6 +302,12 @@ function candidateView(session) {
     '\n-# Pessoas com ponto ativo ou convite pendente não aparecem na lista. A disponibilidade é checada novamente ao enviar.',
     rows, true, 'purple');
 }
+function presenceConfig(s){return v2('📋 LOGS DE PRESENÇA',
+ `**Canal único:** ${s.presenceLogChannelId?`<#${s.presenceLogChannelId}>`:'Não configurado'}\n`+
+ `**Envio automático:** ${s.presenceReportsEnabled?'✅ Ativado':'⛔ Desativado'}\n\n`+
+ 'Ao terminar cada turno, o Nero envia um relatório com presentes, presenças parciais, faltas e justificativas. Os horários já configurados serão utilizados.',
+ [row(button('cfg:presence-channel','Escolher canal',ButtonStyle.Primary,'📨'),button('cfg:presence-toggle',s.presenceReportsEnabled?'Desativar':'Ativar',ButtonStyle.Secondary,'🔁')),
+ row(button('bp:config','Voltar',ButtonStyle.Secondary,'↩️'))],true,'purple')}
 function modeConfig(settings){return v2('👥 ATIVAR EQUIPES',
  `**Equipes:** ${settings.pointMode==='team'?'✅ ATIVADAS':'⛔ DESATIVADAS'}\n\n`+
  '**Ativar equipes:** membros precisam aceitar o convite antes de iniciar o ponto.\n'+
@@ -323,7 +328,7 @@ function justificationPanel(ephemeral=false,visual=null){
   c.addTextDisplayComponents(text(`## ${title}`));
   c.addTextDisplayComponents(text(description));
   c.addTextDisplayComponents(text(
-    'Informe a **data (DD/MM/AAAA)** e o **motivo**. A equipe responsável analisa a solicitação. '+
+    'Informe a **data inicial**, a **quantidade de dias de serviço** e o **motivo**. A equipe responsável analisa a solicitação. '+
     'Enquanto estiver pendente, uma eventual advertência daquele dia fica suspensa.\n\n'+
     '-# Evite incluir dados médicos ou outras informações sensíveis.'
   ));
@@ -363,24 +368,24 @@ function notificationsConfig(s){const n=s.notifications;
   row(button('bp:config','Voltar',ButtonStyle.Secondary,'↩️'))],true,'purple')}
 function justificationReview(j){return v2('SOLICITAÇÃO DE JUSTIFICATIVA',
  `**Protocolo:** ${safe(j.id)}\n**Membro:** <@${j.userId}>\n**Turno:** ${shiftLabel(j.shift)}\n`+
- `**Dia:** ${safe(formatDateBR(j.date))}\n**Motivo:** ${safe(j.reason)}\n**Status:** Em análise`,
+ `**Período:** ${(j.dates||[j.date]).map(formatDateBR).join(', ')} (${j.days||1} dia(s))\n**Motivo:** ${safe(j.reason)}\n**Status:** Em análise`,
  [row(button(`justify:approve:${j.id}`,'Aprovar',ButtonStyle.Success),button(`justify:reject:${j.id}`,'Recusar',ButtonStyle.Danger))],false,'amber')}
 function justificationDecisionLog(j){return v2(j.status==='approved'?'JUSTIFICATIVA APROVADA':'JUSTIFICATIVA RECUSADA',
  `**Protocolo:** ${safe(j.id)}\n**Membro:** <@${j.userId}>\n**Turno:** ${shiftLabel(j.shift)}\n`+
- `**Data da ausência:** ${safe(formatDateBR(j.date))}\n**Motivo informado:** ${safe(j.reason)}\n`+
+ `**Datas da ausência:** ${(j.dates||[j.date]).map(formatDateBR).join(', ')}\n**Motivo informado:** ${safe(j.reason)}\n`+
  `**Analisado por:** <@${j.reviewerId}>\n`+
  `**Resultado:** ${j.status==='approved'?'Falta abonada — sem advertência por este dia.':'Falta não abonada — entra na avaliação de presença.'}`,
  [],false,j.status==='approved'?'green':'red')}
 function justificationDM(j){return new EmbedBuilder().setColor(j.status==='approved'?COLORS.green:j.status==='rejected'?COLORS.red:COLORS.amber)
  .setTitle(j.status==='approved'?'Justificativa aprovada':j.status==='rejected'?'Justificativa recusada':'Justificativa em análise')
- .setDescription(`**Protocolo:** ${safe(j.id)}\n**Dia:** ${safe(formatDateBR(j.date))}\n**Turno:** ${shiftLabel(j.shift)}`)
+ .setDescription(`**Protocolo:** ${safe(j.id)}\n**Datas:** ${(j.dates||[j.date]).map(formatDateBR).join(', ')}\n**Turno:** ${shiftLabel(j.shift)}`)
  .setFooter({text:'CENTRAL DE PONTO · Ausências'}).setTimestamp()}
 function pointReceipt(card,member){
- const normal=member.type!=='extra',minutes=core.format(core.durationFor(member,card.endedAt||Date.now()));
+ const minutes=core.format(core.durationFor(member,card.endedAt||Date.now()));
  const pauses=(card.history||[]).filter(h=>h.event==='paused').length;
- return new EmbedBuilder().setColor(normal?COLORS.green:COLORS.purple)
+ return new EmbedBuilder().setColor(COLORS.green)
   .setTitle('✅ Ponto encerrado • Seu comprovante')
-  .setDescription(`**Equipe:** ${safe(card.name)}\n**Turno:** ${shiftLabel(card.shift)}\n**Tipo:** ${normal?'Horas normais':`Hora extra (origem: ${shiftLabel(member.originShift)})`}\n\nSeu ponto foi encerrado. Confira os dados abaixo:`)
+  .setDescription(`**Equipe:** ${safe(card.name)}\n**Turno:** ${shiftLabel(card.shift)}\n**Tipo:** Horas registradas\n\nSeu ponto foi encerrado. Confira os dados abaixo:`)
   .addFields(
    {name:'🪪 Cartão',value:safe(card.id),inline:true},
    {name:'📌 Situação',value:stat[card.status]||'Encerrado',inline:true},
@@ -396,9 +401,9 @@ function receiptActions(){
  return [row(new ButtonBuilder().setLabel('Abrir Central de Horas').setStyle(ButtonStyle.Link).setURL('https://central-de-horas1.vercel.app/'))];
 }
 function receiptPhotoEmbed(card,member,fileName){
- return new EmbedBuilder().setColor(member.type==='extra'?COLORS.purple:COLORS.green)
+ return new EmbedBuilder().setColor(COLORS.green)
   .setTitle('Comprovante digital • Ponto encerrado')
-  .setDescription(`**${safe(card.name)}** · ${shiftLabel(card.shift)}\nCartão ${safe(card.id)} · ${member.type==='extra'?'Horas extras':'Horas normais'}`)
+  .setDescription(`**${safe(card.name)}** · ${shiftLabel(card.shift)}\nCartão ${safe(card.id)} · Horas registradas`)
   .setImage(`attachment://${fileName}`)
   .setFooter({text:'Central de Ponto · Registro individual'});
 }
@@ -414,5 +419,5 @@ function warningLog(w){return v2(w.status==='revoked'?'ADVERTÊNCIA REVOGADA':'A
 module.exports = {
   COLORS, safe, mentions, row, button, v2, msg, panel, cardText, logCard, auditLog,
   inviteDM, dmOutcome, select, roleSelect, channelSelect, config, shiftConfig, notificationsConfig,justificationRolesConfig,
-  teamMenu, candidateView, stat,modeConfig,justificationPanel,justificationConfig,justificationReview,justificationDecisionLog,justificationDM,warningDM,warningLog,pointReceipt,receiptPhotoEmbed,receiptActions
+  teamMenu, candidateView, stat,modeConfig,presenceConfig,justificationPanel,justificationConfig,justificationReview,justificationDecisionLog,justificationDM,warningDM,warningLog,pointReceipt,receiptPhotoEmbed,receiptActions
 };
