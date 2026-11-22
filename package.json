@@ -1,6 +1,6 @@
 {
   "name": "central-de-ponto-equipes-rp",
-  "version": "3.7.5",
+  "version": "3.8.0",
   "description": "Central de Horas — ativar equipes, fiscalização por turno no site e sincronização antecipada",
   "private": true,
   "main": "index.js",
