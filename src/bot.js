@@ -13,6 +13,7 @@ const attend=require('./attendance');
 const {parseDateBR,formatDateBR}=require('./date-br');
 const {sendReceiptDM}=require('./receipt-dm');
 const attendRuntime=require('./attendance-runtime');
+const presenceReports=require('./presence-reports');
 const panelSync=require('./panel-sync');
 const inbox=require('./invite-inbox');
 const token=process.env.DISCORD_TOKEN;
@@ -134,7 +135,7 @@ async function fetchEligible(guild,shift,type,exclude=[]){
   if(blocked.has(m.id)){diagnostics.excluded++;continue;}
   if(core.busy(g,m.id)){diagnostics.busy++;continue;}
   if(core.pendingInvitation(g,m.id)){diagnostics.pending++;continue;}
-  candidates.push({id:m.id,label:(m.displayName||m.user.username).slice(0,90),desc:type==='extra'?`HORA EXTRA • Origem: ${core.SHIFTS[classification.originShift]}`:'Horas normais • Turno do cartão'});
+  candidates.push({id:m.id,label:(m.displayName||m.user.username).slice(0,90),desc:'Integrante do turno selecionado'});
  }
  candidates.sort((a,b)=>a.label.localeCompare(b.label,'pt-BR'));
  return {candidates,diagnostics};
@@ -173,14 +174,14 @@ async function startSolo(i,shift){
  }catch(e){delete g.cards[c.id];store.save();await changeRole(guild,c,[i.user.id],false).catch(()=>{});throw e;}
 }
 async function showInvites(i){
- const invites=inbox.pending(db(i.guild),i.user.id),limit=4;
+ const invites=inbox.pending(db(i.guild),i.user.id).filter(x=>x.type!=='extra'),limit=4;
  if(!invites.length)return present(i,ui.v2('📨 MEUS CONVITES',
   'Você não possui convites pendentes neste servidor. Quando alguém convidar você para uma equipe, volte aqui para aceitar ou recusar. Não é necessário abrir o PV.'));
  const body=invites.slice(0,limit).map((entry,n)=>{
-  const c=entry.card,extra=entry.type==='extra';
+  const c=entry.card;
   return `**${n+1}. Equipe ${ui.safe(c.name)}** · ${c.id}\n`+
    `**Turno:** ${core.SHIFTS[c.shift]} · **Líder:** <@${c.leaderId}>\n`+
-   `**Modalidade:** ${extra?'Hora extra · origem '+core.SHIFTS[entry.originShift]:'Horas normais'}\n`+
+   `**Modalidade:** Horas do turno\n`+
    `**Validade:** <t:${Math.floor(entry.expiresAt/1000)}:R>`;
  }).join('\n\n')+(invites.length>limit?`\n\nHá mais ${invites.length-limit} convite(s); volte aqui após responder aos primeiros.`:'');
  const controls=invites.slice(0,limit).map(entry=>{
@@ -200,7 +201,7 @@ async function showMine(i){
  const body=`**Cartão:** ${card.id}\n**Equipe:** ${ui.safe(card.name)}\n**Turno:** ${core.SHIFTS[card.shift]}\n`+
  `**Situação:** ${ui.stat[card.status]}\n**Início:** <t:${Math.floor(m.joinedAt/1000)}:f>\n`+
  `**Tempo válido:** ${core.format(core.durationFor(m))}\n**Pausas registradas:** ${paused}\n`+
- `**Modalidade:** ${m.type==='extra'?'Hora extra':'Horas normais'}`;
+ `**Modalidade:** Horas registradas`;
  const controls=card.leaderId===i.user.id&&['active','paused'].includes(card.status)?[
   ui.row(ui.button('bp:pause',card.status==='active'?'Pausar':'Retomar',ButtonStyle.Secondary),ui.button(`act:end:${card.id}`,'Encerrar',ButtonStyle.Danger))]:[];
  return present(i,ui.v2('MEU PONTO ATIVO',body,controls));
@@ -248,7 +249,7 @@ async function onButton(i){const [prefix,verb,arg]=i.customId.split(':');const g
   if(verb==='invites')return showInvites(i);
   if(verb==='mine')return showMine(i);
   if(verb==='justify')return present(i,ui.justificationPanel(true,s.justifications.panelVisual));
-  if(verb==='ranking')return present(i,ui.v2('🏆 RANKING POR HORAS',core.ranking(g).slice(0,15).map((r,n)=>`${n+1}. <@${r.userId}> — ${core.format(r.normal)} normais · ${core.format(r.extra)} extras`).join('\n')||'Ainda não há horas.'));
+  if(verb==='ranking')return present(i,ui.v2('🏆 RANKING POR HORAS',core.ranking(g).slice(0,15).map((r,n)=>`${n+1}. <@${r.userId}> — ${core.format(r.total)} de serviço`).join('\n')||'Ainda não há horas.'));
   if(verb==='monitor')return showMonitor(i);
   if(verb==='config')return await isAdmin(i)?present(i,ui.config(s)):fail(i,'Somente administradores com Gerenciar Servidor podem configurar.');
  }
@@ -284,7 +285,7 @@ async function onButton(i){const [prefix,verb,arg]=i.customId.split(':');const g
   if(s.pointMode!=='team')return fail(i,'O modo Equipe não está habilitado.');
   const c=g.cards[arg];if(!c||c.leaderId!==i.user.id||c.status!=='active')return fail(i,'Somente o líder de equipe ativa pode convidar.');
   if(verb==='members')return present(i,ui.v2('👥 INTEGRANTES',ui.cardText(c)));
-  if(verb!=='normal'&&verb!=='extra')return fail(i,'Opção inválida.');
+  if(verb!=='normal')return fail(i,'Convite indisponível. Somente integrantes do próprio turno podem entrar.');
   if(c.members.length+Object.keys(c.joinInvites||{}).length>=s.maxMembers)return fail(i,'Equipe completa.');
   return startCandidateSession(i,{kind:'add',shift:c.shift,type:verb,cardId:c.id});
  }
@@ -433,13 +434,13 @@ async function onSelect(i){const [prefix,verb,arg]=i.customId.split(':');const g
   let dmSent=true;
   try{await m.user.send(ui.inviteDM(c,guild.id,userId,'join',classified));}
   catch(e){dmSent=false;console.warn('[Convite] PV indisponível para',userId,e.message);}
-  sessions.delete(sid(i));return present(i,ui.msg(`📨 Convite criado para <@${userId}> (${ses.type==='extra'?`⏱️ HORA EXTRA · turno original ${core.SHIFTS[classified.originShift]}`:'👤 Horas normais do turno'}). O integrante aceita no botão **Meus convites** do painel do servidor.${dmSent?' O PV também foi enviado.':' ⚠️ PV bloqueado: o convite pelo servidor continua disponível.'} As horas só começam após o aceite, sem afetar os colegas.`));
+  sessions.delete(sid(i));return present(i,ui.msg(`📨 Convite criado para <@${userId}> (integrante do turno). O integrante aceita no botão **Meus convites** do painel do servidor.${dmSent?' O PV também foi enviado.':' ⚠️ PV bloqueado: o convite pelo servidor continua disponível.'} As horas só começam após o aceite, sem afetar os colegas.`));
  }
  if(prefix==='mine'){
   const c=g.cards[i.values[0]];if(!c||!c.members.some(m=>m.userId===i.user.id))return fail(i,'Cartão não encontrado.');
   const rows=[];if(c.leaderId===i.user.id&&['active','paused'].includes(c.status))rows.push(ui.row(ui.button(`act:end:${c.id}`,'Encerrar ponto',ButtonStyle.Danger,'🔴')));
   const mine=c.members.find(m=>m.userId===i.user.id);
-  const status=mine?.type==='extra'?`⏱️ **Sua hora extra:** ${core.format(core.durationFor(mine))} (turno original: ${core.SHIFTS[mine.originShift]})`:`🟦 **Suas horas normais:** ${core.format(core.durationFor(mine))}`;
+  const status=`🟦 **Suas horas registradas:** ${core.format(core.durationFor(mine))}`;
   return present(i,ui.v2('📋 MEU CARTÃO',status+'\n\n'+ui.cardText(c),rows));
  }
  if(prefix==='monitor'){
@@ -574,7 +575,7 @@ async function handleDM(i){
    await audit(guild,{type:'Entrada da equipe',cardId:c.id,shift:c.shift,actorId:i.user.id,at:Date.now()});
    return respond(`✅ Equipe **${ui.safe(c.name)}** iniciou o serviço!`);
   }
-  const inv=c.joinInvites?.[i.user.id];if(!inv)return respond('Convite encerrado ou não destinado a você.');
+  const inv=c.joinInvites?.[i.user.id];if(!inv||inv.type!=='normal')return respond('Convite indisponível. Somente integrantes do turno podem entrar.');
   if(action==='yes'){
    const classified=core.allowedFor(g.settings.shifts,c.shift,rolesOf(target),inv.type);
    if(!classified||classified.originShift!==inv.originShift)return respond('Seu cargo do turno mudou. Solicite novo convite.');
@@ -583,8 +584,8 @@ async function handleDM(i){
    try{core.respondJoin(g,c,i.user.id,true);}catch(e){await changeRole(guild,c,[i.user.id],false);throw e;}
   }else core.respondJoin(g,c,i.user.id,false);
   store.save();siteSync.requestUpdate(client);await refreshCard(guild,c);
-  await audit(guild,{type:action==='yes'?(inv.type==='extra'?'Hora extra aceita':'Membro aceitou'):'Convite recusado',cardId:c.id,shift:c.shift,actorId:i.user.id,at:Date.now()});
-  return respond(action==='yes'?`✅ Você entrou na equipe ${ui.safe(c.name)} como ${inv.type==='extra'?'HORA EXTRA':'integrante normal'}. Contagem iniciada agora.`:'❌ Convite recusado.');
+  await audit(guild,{type:action==='yes'?'Membro aceitou':'Convite recusado',cardId:c.id,shift:c.shift,actorId:i.user.id,at:Date.now()});
+  return respond(action==='yes'?`✅ Você entrou na equipe ${ui.safe(c.name)} como integrante do turno. Contagem iniciada agora.`:'❌ Convite recusado.');
  }finally{locks.delete(c.id);}
 }
 async function syncGuild(guild){try{await guild.commands.set(commands.map(c=>c.toJSON()));console.log(`✅ /painelbateponto em ${guild.name}`);}catch(e){console.error(`Falha sincronização ${guild.id}:`,e.message);}}
@@ -653,4 +654,5 @@ process.on('unhandledRejection',e=>console.error('Rejeição inesperada:',e));
 process.on('uncaughtException',e=>console.error('Erro crítico:',e));
 siteSync.install(client);
 attendRuntime.install(client);
+presenceReports.install(client);
 client.login(token).catch(e=>{console.error('Falha no login:',e.message);process.exitCode=1;});
