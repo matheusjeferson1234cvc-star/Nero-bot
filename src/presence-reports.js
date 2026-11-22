@@ -80,6 +80,7 @@ async function runGuild(guild,now=Date.now()){
  const today=attendance.localDay(now,s.timezone);
  let sent=0;
  for(const date of [attendance.plusDays(today,-1),today])for(const shift of Object.keys(core.SHIFTS)){
+  if(!(s.shifts[shift].roleIds||[]).length)continue;
   const key=date+':'+shift,close=windowFor(date,shift,s).end;
   if(a.presenceReports[key]||close>now||now-close>24*HOUR||close<a.presenceReportStartedAt)continue;
   const report=compileReport(g,date,shift,now);
