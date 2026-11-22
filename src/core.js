@@ -7,17 +7,17 @@ function defaultSettings(){
  const windows={manha:['06:00','12:00'],tarde:['12:00','18:00'],noite:['18:00','00:00'],madrugada:['00:00','06:00']};
  return {
   notifications:{pointDm:true,receiptImage:false},
-  timezone:'America/Sao_Paulo',pointMode:'team',serviceRoleId:null,auditChannelId:null,inviteMinutes:15,minMembers:2,maxMembers:4,
+  timezone:'America/Sao_Paulo',pointMode:'team',serviceRoleId:null,auditChannelId:null,presenceLogChannelId:null,presenceReportsEnabled:true,inviteMinutes:15,minMembers:2,maxMembers:4,
   justifications:{reviewChannelId:null,logChannelId:null,warningChannelId:null,warningRoles:[null,null,null],panel:null,autoWarnings:false,panelVisual:{title:'Justificativa de ausência',description:'Solicite a análise de uma ausência pela Central de Horas.',customGif:null}},
   shifts:Object.fromEntries(Object.entries(windows).map(([id,[start,end]])=>[id,{start,end,roleIds:[],supervisorRoles:[],logChannelId:null}])),
-  panel:{title:'🕒 CENTRAL DE PONTO',description:'🟢 **Iniciar / Encerrar** · Monte a equipe e registre o serviço.\n⏯️ **Pausar / Retornar** · Controle a contagem de horas.\n👥 **Gerenciar equipe** · Convide membros normais ou extras.\n📋 **Meus pontos** · Consulte cartões e tempo trabalhado.',customGif:null,published:null}
+  panel:{title:'🕒 CENTRAL DE PONTO',description:'🟢 **Iniciar / Encerrar** · Monte a equipe e registre o serviço.\n⏯️ **Pausar / Retornar** · Controle a contagem de horas.\n👥 **Gerenciar equipe** · Convide membros do seu turno.\n📋 **Meus pontos** · Consulte cartões e tempo trabalhado.',customGif:null,published:null}
  };
 }
-function defaultGuild(){return {settings:defaultSettings(),cards:{},nextNumber:1,audit:[],justifications:{},nextJustification:1,attendance:{rosters:{},days:{},processed:{},streaks:{},warningLevels:{},warnings:{},nextWarning:1,enabledAfterDate:'9999-12-31'},siteOff:{data:{weekly:{all:[0]},dates:[]},syncedAt:0}};}
+function defaultGuild(){return {settings:defaultSettings(),cards:{},nextNumber:1,audit:[],justifications:{},nextJustification:1,attendance:{rosters:{},days:{},processed:{},streaks:{},warningLevels:{},warnings:{},presenceReports:{},presenceReportStartedAt:0,nextWarning:1,enabledAfterDate:'9999-12-31'},siteOff:{data:{weekly:{all:[0]},dates:[]},syncedAt:0}};}
 function padGuild(g){
  const base=defaultSettings();g.settings??={};g.cards??={};g.audit??=[];g.nextNumber??=1;g.justifications??={};g.nextJustification??=1;g.siteOff??={data:{weekly:{all:[0]},dates:[]},syncedAt:0};g.attendance??={};
- for(const key of ['rosters','days','processed','streaks','warningLevels','warnings'])g.attendance[key]??={};
- g.attendance.nextWarning??=1;g.attendance.enabledAfterDate??='9999-12-31';
+ for(const key of ['rosters','days','processed','streaks','warningLevels','warnings','presenceReports'])g.attendance[key]??={};
+ g.attendance.nextWarning??=1;g.attendance.enabledAfterDate??='9999-12-31';g.attendance.presenceReportStartedAt??=0;
  const existing=g.settings;g.settings={...base,...existing,shifts:{}};
  for(const id of Object.keys(SHIFTS)){
   const old=existing.shifts?.[id]||{};
@@ -47,10 +47,9 @@ function classify(shiftSettings,shift,roleIds){
  const owned=new Set(roleIds||[]);
  const own=(shiftSettings[shift]?.roleIds||[]).some(id=>owned.has(id));
  if(own)return {type:'normal',originShift:shift};
- const other=Object.keys(SHIFTS).find(k=>k!==shift&&(shiftSettings[k]?.roleIds||[]).some(id=>owned.has(id)));
- return other?{type:'extra',originShift:other}:null;
+ return null;
 }
-function allowedFor(shiftSettings,shift,roleIds,type){const c=classify(shiftSettings,shift,roleIds);return c&&c.type===type?c:null;}
+function allowedFor(shiftSettings,shift,roleIds,type){const c=classify(shiftSettings,shift,roleIds);return type==='normal'&&c?c:null;}
 function list(g){return Object.values(g.cards||{});}
 function expire(card,now=Date.now()){
  if(card.status==='pending'&&now>card.expiresAt){card.status='expired';card.history.push({event:'expired',at:now});}
@@ -119,7 +118,7 @@ function inviteJoin(g,card,userId,actor,classification,now=Date.now()){
  if(card.members.length+Object.keys(card.joinInvites).length>=g.settings.maxMembers)throw Error('Equipe completa.');
  if(card.members.some(m=>m.userId===userId)||card.joinInvites[userId])throw Error('Usuário já participa ou foi convidado.');
  if(busy(g,userId,now)||pendingInvitation(g,userId,now))throw Error('Usuário já está em outra equipe ou tem convite pendente.');
- if(!classification||!['normal','extra'].includes(classification.type)||!SHIFTS[classification.originShift])throw Error('O integrante precisa ter um cargo de turno autorizado.');
+ if(!classification||classification.type!=='normal'||classification.originShift!==card.shift)throw Error('O integrante precisa ter um cargo de turno autorizado.');
  card.joinInvites[userId]={at:now,expiresAt:now+g.settings.inviteMinutes*60000,type:classification.type,originShift:classification.originShift};
  card.history.push({event:'join_invited',at:now,actor,userId,type:classification.type});return card;
 }
@@ -147,7 +146,7 @@ function cancelHours(card,users,{actor,reason,now=Date.now()}){
  return affected;
 }
 function totalFor(card,now=Date.now()){
- const totals={normal:0,extra:0};for(const m of card.members)totals[m.type==='extra'?'extra':'normal']+=durationFor(m,now);return totals;
+ const totals={normal:0,extra:0};for(const m of card.members)totals.normal+=durationFor(m,now);return totals;
 }
 // Saldo individual utilizado em Meus Pontos e disponível para a futura integração com o site.
 // Nunca credita as horas de um membro a outro; convites só contam depois do aceite.
@@ -158,7 +157,7 @@ function hoursForUser(g,userId,now=Date.now()){
   const m=card.members.find(member=>member.userId===userId);
   if(!m)continue;
   const ms=durationFor(m,now);
-  result[m.type==='extra'?'extra':'normal']+=ms;
+  result.normal+=ms;
   result.total+=ms;
   result.cards++;
  }
@@ -168,7 +167,7 @@ function ranking(g,now=Date.now()){
  const result=new Map();for(const card of list(g)){
   if(['pending','expired','declined'].includes(card.status))continue;
   for(const m of card.members){const ms=durationFor(m,now);if(!ms)continue;
-   const row=result.get(m.userId)||{userId:m.userId,normal:0,extra:0,total:0};row[m.type==='extra'?'extra':'normal']+=ms;row.total+=ms;result.set(m.userId,row);
+   const row=result.get(m.userId)||{userId:m.userId,normal:0,extra:0,total:0};row.normal+=ms;row.total+=ms;result.set(m.userId,row);
   }
  }
  return [...result.values()].sort((a,b)=>b.total-a.total);
