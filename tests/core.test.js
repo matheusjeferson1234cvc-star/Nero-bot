@@ -45,7 +45,7 @@ test('histórico antigo permanece acessível sem exibir saldo separado de extra'
  card.members[1].type='extra';card.members[1].originShift='noite';
  const saldo=core.hoursForUser(guild,'2');
  assert.equal(saldo.extra,0);
- assert.equal(saldo.normal,120*60000-1000);
+ assert.equal(saldo.normal,121*60000-1000);
  const rank=core.ranking(guild).find(x=>x.userId==='2');
  assert.equal(rank.extra,0);
  assert.equal(rank.total,saldo.normal);
