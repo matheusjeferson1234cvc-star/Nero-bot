@@ -3,8 +3,10 @@ const core=require('./core');
 const schema=require('./bot-config-schema');
 function apply(g,raw,revision){
  if(!raw)return {changed:false,applied:false};
- const cfg=schema.normalize(raw);
  const current=schema.normalize(g.settings);
+ // Sites antigos ainda não enviam os campos de presença: preservar a escolha feita no Discord.
+ const cfg=schema.normalize({...raw,presenceLogChannelId:raw.presenceLogChannelId===undefined?current.presenceLogChannelId:raw.presenceLogChannelId,
+  presenceReportsEnabled:raw.presenceReportsEnabled===undefined?current.presenceReportsEnabled:raw.presenceReportsEnabled});
  const changed=JSON.stringify(cfg)!==JSON.stringify(current);
  if(changed){
   const prev=g.settings;
