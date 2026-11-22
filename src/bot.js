@@ -306,7 +306,7 @@ async function onButton(i){const [prefix,verb,arg]=i.customId.split(':');const g
  }
  if(prefix==='just'&&verb==='home')return present(i,ui.justificationPanel(true,s.justifications.panelVisual));
  if(prefix==='just'&&verb==='open'){
-  return i.showModal(modal('just:submit','Justificar ausência',[{id:'day',label:'Data (DD/MM/AAAA)',placeholder:'07/11/2026',max:10},{id:'reason',label:'Motivo (não inclua dados sensíveis)',style:TextInputStyle.Paragraph,max:500}]));
+  return i.showModal(modal('just:submit','Justificar ausência',[{id:'day',label:'Início (DD/MM/AAAA)',placeholder:'23/11/2026',max:10},{id:'days',label:'Dias de serviço (1 a 60)',placeholder:'3',max:2},{id:'reason',label:'Motivo (não inclua dados sensíveis)',style:TextInputStyle.Paragraph,max:500}]));
  }
  if(prefix==='justify'){
   if(!['approve','reject'].includes(verb))return fail(i,'Ação inválida.');
@@ -315,7 +315,7 @@ async function onButton(i){const [prefix,verb,arg]=i.customId.split(':');const g
   await defer(i);
   j.status=verb==='approve'?'approved':'rejected';j.reviewerId=i.user.id;j.decidedAt=Date.now();store.save();
   const dest=await client.users.fetch(j.userId).catch(()=>null);if(dest)await dest.send({embeds:[ui.justificationDM(j)],allowedMentions:ui.mentions}).catch(()=>{});
-  if(i.message)await i.message.edit(ui.v2('JUSTIFICATIVA ANALISADA',`**Protocolo:** ${j.id}\n**Membro:** <@${j.userId}>\n**Dia:** ${formatDateBR(j.date)}\n**Situação:** ${j.status==='approved'?'Aprovada':'Recusada'}\n**Responsável:** <@${i.user.id}>`,[],false));
+  if(i.message)await i.message.edit(ui.v2('JUSTIFICATIVA ANALISADA',`**Protocolo:** ${j.id}\n**Membro:** <@${j.userId}>\n**Dias:** ${(j.dates||[j.date]).map(formatDateBR).join(', ')}\n**Situação:** ${j.status==='approved'?'Aprovada':'Recusada'}\n**Responsável:** <@${i.user.id}>`,[],false));
   const logId=s.justifications.logChannelId||s.justifications.reviewChannelId;
   if(logId)try{const logCh=await fetchText(guild,logId,'de justificativas');await logCh.send(ui.justificationDecisionLog(j))}
    catch(err){console.warn('Não foi possível publicar o log de justificativa:',err.message)}
@@ -367,6 +367,9 @@ async function onButton(i){const [prefix,verb,arg]=i.customId.split(':');const g
    {id:'gif',label:'Link GIF HTTPS (ou "padrao")',value:s.panel.customGif||'',max:300,required:false}]));
   if(verb==='monitor')return showMonitor(i);
   if(verb==='mode')return present(i,ui.modeConfig(s));
+   if(verb==='presence')return present(i,ui.presenceConfig(s));
+   if(verb==='presence-channel')return present(i,ui.v2('📋 CANAL DE PRESENÇA','Escolha um único canal para receber os relatórios automáticos de todos os turnos.',[ui.channelSelect('save:presence:all'),ui.row(ui.button('cfg:presence','Voltar',ButtonStyle.Secondary))]));
+   if(verb==='presence-toggle'){s.presenceReportsEnabled=!s.presenceReportsEnabled;if(s.presenceReportsEnabled)g.attendance.presenceReportStartedAt=Date.now();store.save();siteSync.requestUpdate(client);return present(i,ui.presenceConfig(s));}
   if(verb==='mode-team'||verb==='mode-individual'){
    s.pointMode=verb==='mode-individual'?'individual':'team';store.save();siteSync.requestUpdate(client);await refreshPanel(guild);return present(i,ui.modeConfig(s));
   }
@@ -460,12 +463,13 @@ async function onSelect(i){const [prefix,verb,arg]=i.customId.split(':');const g
   else if(verb==='log')s.shifts[arg].logChannelId=val[0]||null;
   else if(verb==='service')s.serviceRoleId=val[0]||null;
   else if(verb==='audit')s.auditChannelId=val[0]||null;
+   else if(verb==='presence'){s.presenceLogChannelId=val[0]||null;g.attendance.presenceReportStartedAt=Date.now();}
   else if(verb==='just-review')s.justifications.reviewChannelId=val[0]||null;
   else if(verb==='just-log')s.justifications.logChannelId=val[0]||null;
   else if(verb==='just-warning')s.justifications.warningChannelId=val[0]||null;
   else if(/^just-role-[123]$/.test(verb))s.justifications.warningRoles[Number(verb.slice(-1))-1]=val[0]||null;
   else return fail(i,'Campo desconhecido.');
-  store.save();return present(i,verb==='roles'||verb==='super'||verb==='log'?ui.shiftConfig(s,arg):/^just-role-[123]$/.test(verb)?ui.justificationRolesConfig(s):verb.startsWith('just-')?ui.justificationConfig(s):ui.config(s));
+  store.save();siteSync.requestUpdate(client);return present(i,verb==='roles'||verb==='super'||verb==='log'?ui.shiftConfig(s,arg):verb==='presence'?ui.presenceConfig(s):/^just-role-[123]$/.test(verb)?ui.justificationRolesConfig(s):verb.startsWith('just-')?ui.justificationConfig(s):ui.config(s));
  }
  return fail(i,'Seleção desconhecida.');
 }
@@ -477,17 +481,21 @@ async function onModal(i){const [prefix,verb,arg]=i.customId.split(':');const gu
  if(prefix==='just'&&verb==='submit'){
   if(!s.justifications.reviewChannelId)return fail(i,'O canal de análise ainda não foi configurado.');
   const dateInput=i.fields.getTextInputValue('day').trim(),reason=i.fields.getTextInputValue('reason').trim();
+   const count=Number(i.fields.getTextInputValue('days').trim());
+   if(!Number.isInteger(count)||count<1||count>60)return fail(i,'Informe de 1 a 60 dias de serviço.');
   const day=parseDateBR(dateInput);
   if(!day)return fail(i,'Informe uma data válida no formato DD/MM/AAAA (ex.: 07/11/2026).');
   const today=attend.localDay(Date.now(),s.timezone),oldest=attend.plusDays(today,-45);
-  if(day>today||day<oldest)return fail(i,'Justifique uma data de até 45 dias atrás, não futura.');
+  if(day>attend.plusDays(today,60)||day<oldest)return fail(i,'Data inicial deve estar entre 45 dias atrás e 60 dias à frente.');
+   const dates=attend.requestedDates(day,count);
+   if(dates.at(-1)>attend.plusDays(today,120))return fail(i,'O período solicitado é muito longo.');
   if(reason.length<10)return fail(i,'Explique a ausência com pelo menos 10 caracteres.');
   const actor=await member(guild,i.user.id);const shifts=Object.keys(core.SHIFTS).filter(k=>s.shifts[k].roleIds.some(id=>actor.roles.cache.has(id)));
   if(shifts.length!==1)return fail(i,shifts.length?'Seu perfil possui vários turnos. Peça ao responsável para ajustar seu cargo.':'Você precisa de um cargo de turno para justificar.');
   const shift=shifts[0];
-  if(Object.values(g.justifications).some(j=>j.userId===i.user.id&&j.date===day&&j.shift===shift&&j.status!=='rejected'))return fail(i,'Já existe justificativa pendente ou aprovada neste dia.');
+  if(Object.values(g.justifications).some(j=>j.userId===i.user.id&&j.shift===shift&&j.status!=='rejected'&&dates.some(d=>j.date===d||j.dates?.includes(d))))return fail(i,'Já existe justificativa pendente ou aprovada em alguma data solicitada.');
   const id=`JST-${String(g.nextJustification++).padStart(6,'0')}`;
-  const j={id,userId:i.user.id,date:day,shift,reason,status:'pending',at:Date.now(),reviewerId:null,decidedAt:null};
+  const j={id,userId:i.user.id,date:dates[0],startDate:day,days:count,dates,shift,reason,status:'pending',at:Date.now(),reviewerId:null,decidedAt:null};
   const channel=await fetchText(guild,s.justifications.reviewChannelId,'de análise');
   await channel.send(ui.justificationReview(j));g.justifications[id]=j;store.save();
   await i.user.send({embeds:[ui.justificationDM(j)],allowedMentions:ui.mentions}).catch(()=>{});
