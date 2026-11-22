@@ -12,9 +12,9 @@ function template(card,member,displayName='Membro',options={}) {
  const worked=duration(core.durationFor(member,times.end||Date.now()));
  const start=date(times.start,options.timezone),end=date(times.end,options.timezone);
  const pauses=(card.history||[]).filter(x=>x.event==='paused').length;
- const isExtra=member.type==='extra',color=isExtra?'#b580ff':'#fb6575';
+ const color='#fb6575';
  const plainShift=v=>String(v||'').replace(/[^A-Za-zÀ-ÿ0-9\s-]/g,'').trim();
- const className=isExtra?`HORA EXTRA • ORIGEM: ${short(plainShift(core.SHIFTS[member.originShift]||'Outro turno'))}`:'HORAS NORMAIS';
+ const className='HORAS REGISTRADAS';
  return `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1010" viewBox="0 0 800 1010">
  <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#07090c"/><stop offset="1" stop-color="#141018"/></linearGradient></defs>
  <rect width="800" height="1010" fill="#08090c"/><rect width="800" height="1010" rx="28" fill="url(#bg)"/>

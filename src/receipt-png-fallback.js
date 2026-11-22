@@ -68,7 +68,7 @@ function produce(card,member,displayName='Membro',options={}) {
  field('MEMBRO',displayName,275,4);
  field('CARTAO',card.id,380,3);
  field('TURNO',core.SHIFTS[card.shift]||card.shift,475,4);
- field('TIPO',member.type==='extra'?'HORAS EXTRAS':'HORAS NORMAIS',567,4);
+ field('TIPO','HORAS REGISTRADAS',567,4);
  field('INICIO',fmtDate(start.start),657,4);
  field('ENCERRAMENTO',fmtDate(start.end),750,4);
  rect(58,835,684,92,colors.panel);

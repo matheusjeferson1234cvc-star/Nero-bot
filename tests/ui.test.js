@@ -92,22 +92,21 @@ test('cartões possuem cores por status e deixam cancelar após finalizar', () =
   assert.equal(ended.components[0].components.some(c => c.components.some(x => x.customId?.startsWith('card:cancel:'))), true);
   assert.equal(canceled.components[0].components.some(c => c.components.some(x => x.customId?.startsWith('card:cancel:'))), false);
 });
-test('cartão exibe integrante normal, extras, menções e horas', () => {
+test('cartão exibe integrantes e o total de horas sem categoria extra', () => {
   const c = fixture('active');
-  c.members[1].type = 'extra';
-  c.members[1].originShift = 'noite';
+  c.members[1].type = 'normal';
   const output = ui.cardText(c);
-  for (const value of ['<@111111111111111111>', '<@222222222222222222>', 'Hora extra', 'Noite', 'Normais:', 'Extras:'])
+  for (const value of ['<@111111111111111111>', '<@222222222222222222>', 'Horas registradas', 'Total:'])
     assert.ok(output.includes(value), `Faltando: ${value}`);
 });
 test('convites privados são embeds normais, com aceitar/recusar e sem ping automático', () => {
   const c = fixture('pending');
-  const invite = ui.inviteDM(c, '444444444444444444', '222222222222222222', 'join', {type: 'extra', originShift: 'noite'});
+  const invite = ui.inviteDM(c, '444444444444444444', '222222222222222222', 'join', {type: 'normal', originShift: 'tarde'});
   assert.equal(invite.embeds.length, 1);
   assert.equal(invite.components[0].components.length, 2);
   assert.equal(invite.allowedMentions.parse.length, 0);
-  assert.match(JSON.stringify(invite.embeds[0].fields), /Hora extra/);
-  assert.match(JSON.stringify(invite.embeds[0].fields), /Noite/);
+  assert.match(JSON.stringify(invite.embeds[0].fields), /Horas do turno/);
+  assert.match(JSON.stringify(invite.embeds[0].fields), /Tarde/);
   assert.equal(invite.flags, undefined);
 });
 test('resposta por DM retira botões e diferencia sucesso, aviso e recusa', () => {
@@ -132,7 +131,7 @@ test('auditoria de cancelamento destaca motivo, integrantes e cartão original',
 test('configuração separa turnos, equipe, auditoria e visual', () => {
   const view = ui.config(core.defaultSettings());
   const ids = view.components[0].components.flatMap(c => (c.components || []).map(x => x.customId)).filter(Boolean);
-  assert.deepEqual(ids, ['cfg:shifts','cfg:mode','cfg:rules','cfg:service','cfg:notify','cfg:audit','cfg:visual']);
+  assert.deepEqual(ids, ['cfg:shifts','cfg:mode','cfg:rules','cfg:service','cfg:notify','cfg:audit','cfg:presence','cfg:visual']);
   assert.equal(view.components[0].accent, ui.COLORS.purple);
 });
 
@@ -192,4 +191,27 @@ test('configurações de justificativas são separadas das configurações de po
  const controls=just.components[0].components.flatMap(c=>(c.components||[]).map(x=>x.customId));
  assert.ok(controls.includes('just:config'));
  assert.ok(controls.includes('just:open'));
+});
+
+test('modo individual esconde equipe e convites, ícones do ranking e config sem rótulo',()=>{
+ const team=ui.panel(core.defaultSettings().panel,'team').components[0];
+ const single=ui.panel(core.defaultSettings().panel,'individual').components[0];
+ const controls=x=>x.components.flatMap(r=>(r.components||[]).filter(c=>c.customId));
+ const regular=controls(team),individual=controls(single);
+ assert.ok(regular.some(x=>x.customId==='bp:team'));
+ assert.ok(regular.some(x=>x.customId==='bp:invites'));
+ assert.ok(!individual.some(x=>x.customId==='bp:team'));
+ assert.ok(!individual.some(x=>x.customId==='bp:invites'));
+ for(const id of ['bp:ranking','bp:config']){
+  const b=individual.find(x=>x.customId===id);
+  assert.equal(b.label,undefined);assert.ok(b.emoji);
+ }
+});
+test('logs de presença têm um único canal e opção de ativar ou desativar',()=>{
+ const x=core.defaultSettings();
+ x.presenceLogChannelId='123456789012345678';
+ const uiBox=ui.presenceConfig(x).components[0];
+ assert.match(flattened(uiBox),/123456789012345678/);
+ const ids=uiBox.components.flatMap(r=>(r.components||[]).map(c=>c.customId));
+ assert.ok(ids.includes('cfg:presence-channel'));assert.ok(ids.includes('cfg:presence-toggle'));
 });

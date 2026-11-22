@@ -13,6 +13,7 @@ const attend=require('./attendance');
 const {parseDateBR,formatDateBR}=require('./date-br');
 const {sendReceiptDM}=require('./receipt-dm');
 const attendRuntime=require('./attendance-runtime');
+const presenceReports=require('./presence-reports');
 const panelSync=require('./panel-sync');
 const inbox=require('./invite-inbox');
 const token=process.env.DISCORD_TOKEN;
@@ -134,7 +135,7 @@ async function fetchEligible(guild,shift,type,exclude=[]){
   if(blocked.has(m.id)){diagnostics.excluded++;continue;}
   if(core.busy(g,m.id)){diagnostics.busy++;continue;}
   if(core.pendingInvitation(g,m.id)){diagnostics.pending++;continue;}
-  candidates.push({id:m.id,label:(m.displayName||m.user.username).slice(0,90),desc:type==='extra'?`HORA EXTRA • Origem: ${core.SHIFTS[classification.originShift]}`:'Horas normais • Turno do cartão'});
+  candidates.push({id:m.id,label:(m.displayName||m.user.username).slice(0,90),desc:'Integrante do turno selecionado'});
  }
  candidates.sort((a,b)=>a.label.localeCompare(b.label,'pt-BR'));
  return {candidates,diagnostics};
@@ -173,14 +174,14 @@ async function startSolo(i,shift){
  }catch(e){delete g.cards[c.id];store.save();await changeRole(guild,c,[i.user.id],false).catch(()=>{});throw e;}
 }
 async function showInvites(i){
- const invites=inbox.pending(db(i.guild),i.user.id),limit=4;
+ const invites=inbox.pending(db(i.guild),i.user.id).filter(x=>x.type!=='extra'),limit=4;
  if(!invites.length)return present(i,ui.v2('📨 MEUS CONVITES',
   'Você não possui convites pendentes neste servidor. Quando alguém convidar você para uma equipe, volte aqui para aceitar ou recusar. Não é necessário abrir o PV.'));
  const body=invites.slice(0,limit).map((entry,n)=>{
-  const c=entry.card,extra=entry.type==='extra';
+  const c=entry.card;
   return `**${n+1}. Equipe ${ui.safe(c.name)}** · ${c.id}\n`+
    `**Turno:** ${core.SHIFTS[c.shift]} · **Líder:** <@${c.leaderId}>\n`+
-   `**Modalidade:** ${extra?'Hora extra · origem '+core.SHIFTS[entry.originShift]:'Horas normais'}\n`+
+   `**Modalidade:** Horas do turno\n`+
    `**Validade:** <t:${Math.floor(entry.expiresAt/1000)}:R>`;
  }).join('\n\n')+(invites.length>limit?`\n\nHá mais ${invites.length-limit} convite(s); volte aqui após responder aos primeiros.`:'');
  const controls=invites.slice(0,limit).map(entry=>{
@@ -200,7 +201,7 @@ async function showMine(i){
  const body=`**Cartão:** ${card.id}\n**Equipe:** ${ui.safe(card.name)}\n**Turno:** ${core.SHIFTS[card.shift]}\n`+
  `**Situação:** ${ui.stat[card.status]}\n**Início:** <t:${Math.floor(m.joinedAt/1000)}:f>\n`+
  `**Tempo válido:** ${core.format(core.durationFor(m))}\n**Pausas registradas:** ${paused}\n`+
- `**Modalidade:** ${m.type==='extra'?'Hora extra':'Horas normais'}`;
+ `**Modalidade:** Horas registradas`;
  const controls=card.leaderId===i.user.id&&['active','paused'].includes(card.status)?[
   ui.row(ui.button('bp:pause',card.status==='active'?'Pausar':'Retomar',ButtonStyle.Secondary),ui.button(`act:end:${card.id}`,'Encerrar',ButtonStyle.Danger))]:[];
  return present(i,ui.v2('MEU PONTO ATIVO',body,controls));
@@ -248,7 +249,7 @@ async function onButton(i){const [prefix,verb,arg]=i.customId.split(':');const g
   if(verb==='invites')return showInvites(i);
   if(verb==='mine')return showMine(i);
   if(verb==='justify')return present(i,ui.justificationPanel(true,s.justifications.panelVisual));
-  if(verb==='ranking')return present(i,ui.v2('🏆 RANKING POR HORAS',core.ranking(g).slice(0,15).map((r,n)=>`${n+1}. <@${r.userId}> — ${core.format(r.normal)} normais · ${core.format(r.extra)} extras`).join('\n')||'Ainda não há horas.'));
+  if(verb==='ranking')return present(i,ui.v2('🏆 RANKING POR HORAS',core.ranking(g).slice(0,15).map((r,n)=>`${n+1}. <@${r.userId}> — ${core.format(r.total)} de serviço`).join('\n')||'Ainda não há horas.'));
   if(verb==='monitor')return showMonitor(i);
   if(verb==='config')return await isAdmin(i)?present(i,ui.config(s)):fail(i,'Somente administradores com Gerenciar Servidor podem configurar.');
  }
@@ -284,7 +285,7 @@ async function onButton(i){const [prefix,verb,arg]=i.customId.split(':');const g
   if(s.pointMode!=='team')return fail(i,'O modo Equipe não está habilitado.');
   const c=g.cards[arg];if(!c||c.leaderId!==i.user.id||c.status!=='active')return fail(i,'Somente o líder de equipe ativa pode convidar.');
   if(verb==='members')return present(i,ui.v2('👥 INTEGRANTES',ui.cardText(c)));
-  if(verb!=='normal'&&verb!=='extra')return fail(i,'Opção inválida.');
+  if(verb!=='normal')return fail(i,'Convite indisponível. Somente integrantes do próprio turno podem entrar.');
   if(c.members.length+Object.keys(c.joinInvites||{}).length>=s.maxMembers)return fail(i,'Equipe completa.');
   return startCandidateSession(i,{kind:'add',shift:c.shift,type:verb,cardId:c.id});
  }
@@ -305,7 +306,7 @@ async function onButton(i){const [prefix,verb,arg]=i.customId.split(':');const g
  }
  if(prefix==='just'&&verb==='home')return present(i,ui.justificationPanel(true,s.justifications.panelVisual));
  if(prefix==='just'&&verb==='open'){
-  return i.showModal(modal('just:submit','Justificar ausência',[{id:'day',label:'Data (DD/MM/AAAA)',placeholder:'07/11/2026',max:10},{id:'reason',label:'Motivo (não inclua dados sensíveis)',style:TextInputStyle.Paragraph,max:500}]));
+  return i.showModal(modal('just:submit','Justificar ausência',[{id:'day',label:'Início (DD/MM/AAAA)',placeholder:'23/11/2026',max:10},{id:'days',label:'Dias de serviço (1 a 60)',placeholder:'3',max:2},{id:'reason',label:'Motivo (não inclua dados sensíveis)',style:TextInputStyle.Paragraph,max:500}]));
  }
  if(prefix==='justify'){
   if(!['approve','reject'].includes(verb))return fail(i,'Ação inválida.');
@@ -314,7 +315,7 @@ async function onButton(i){const [prefix,verb,arg]=i.customId.split(':');const g
   await defer(i);
   j.status=verb==='approve'?'approved':'rejected';j.reviewerId=i.user.id;j.decidedAt=Date.now();store.save();
   const dest=await client.users.fetch(j.userId).catch(()=>null);if(dest)await dest.send({embeds:[ui.justificationDM(j)],allowedMentions:ui.mentions}).catch(()=>{});
-  if(i.message)await i.message.edit(ui.v2('JUSTIFICATIVA ANALISADA',`**Protocolo:** ${j.id}\n**Membro:** <@${j.userId}>\n**Dia:** ${formatDateBR(j.date)}\n**Situação:** ${j.status==='approved'?'Aprovada':'Recusada'}\n**Responsável:** <@${i.user.id}>`,[],false));
+  if(i.message)await i.message.edit(ui.v2('JUSTIFICATIVA ANALISADA',`**Protocolo:** ${j.id}\n**Membro:** <@${j.userId}>\n**Dias:** ${(j.dates||[j.date]).map(formatDateBR).join(', ')}\n**Situação:** ${j.status==='approved'?'Aprovada':'Recusada'}\n**Responsável:** <@${i.user.id}>`,[],false));
   const logId=s.justifications.logChannelId||s.justifications.reviewChannelId;
   if(logId)try{const logCh=await fetchText(guild,logId,'de justificativas');await logCh.send(ui.justificationDecisionLog(j))}
    catch(err){console.warn('Não foi possível publicar o log de justificativa:',err.message)}
@@ -366,6 +367,9 @@ async function onButton(i){const [prefix,verb,arg]=i.customId.split(':');const g
    {id:'gif',label:'Link GIF HTTPS (ou "padrao")',value:s.panel.customGif||'',max:300,required:false}]));
   if(verb==='monitor')return showMonitor(i);
   if(verb==='mode')return present(i,ui.modeConfig(s));
+   if(verb==='presence')return present(i,ui.presenceConfig(s));
+   if(verb==='presence-channel')return present(i,ui.v2('📋 CANAL DE PRESENÇA','Escolha um único canal para receber os relatórios automáticos de todos os turnos.',[ui.channelSelect('save:presence:all'),ui.row(ui.button('cfg:presence','Voltar',ButtonStyle.Secondary))]));
+   if(verb==='presence-toggle'){s.presenceReportsEnabled=!s.presenceReportsEnabled;if(s.presenceReportsEnabled)g.attendance.presenceReportStartedAt=Date.now();store.save();siteSync.requestUpdate(client);return present(i,ui.presenceConfig(s));}
   if(verb==='mode-team'||verb==='mode-individual'){
    s.pointMode=verb==='mode-individual'?'individual':'team';store.save();siteSync.requestUpdate(client);await refreshPanel(guild);return present(i,ui.modeConfig(s));
   }
@@ -433,13 +437,13 @@ async function onSelect(i){const [prefix,verb,arg]=i.customId.split(':');const g
   let dmSent=true;
   try{await m.user.send(ui.inviteDM(c,guild.id,userId,'join',classified));}
   catch(e){dmSent=false;console.warn('[Convite] PV indisponível para',userId,e.message);}
-  sessions.delete(sid(i));return present(i,ui.msg(`📨 Convite criado para <@${userId}> (${ses.type==='extra'?`⏱️ HORA EXTRA · turno original ${core.SHIFTS[classified.originShift]}`:'👤 Horas normais do turno'}). O integrante aceita no botão **Meus convites** do painel do servidor.${dmSent?' O PV também foi enviado.':' ⚠️ PV bloqueado: o convite pelo servidor continua disponível.'} As horas só começam após o aceite, sem afetar os colegas.`));
+  sessions.delete(sid(i));return present(i,ui.msg(`📨 Convite criado para <@${userId}> (integrante do turno). O integrante aceita no botão **Meus convites** do painel do servidor.${dmSent?' O PV também foi enviado.':' ⚠️ PV bloqueado: o convite pelo servidor continua disponível.'} As horas só começam após o aceite, sem afetar os colegas.`));
  }
  if(prefix==='mine'){
   const c=g.cards[i.values[0]];if(!c||!c.members.some(m=>m.userId===i.user.id))return fail(i,'Cartão não encontrado.');
   const rows=[];if(c.leaderId===i.user.id&&['active','paused'].includes(c.status))rows.push(ui.row(ui.button(`act:end:${c.id}`,'Encerrar ponto',ButtonStyle.Danger,'🔴')));
   const mine=c.members.find(m=>m.userId===i.user.id);
-  const status=mine?.type==='extra'?`⏱️ **Sua hora extra:** ${core.format(core.durationFor(mine))} (turno original: ${core.SHIFTS[mine.originShift]})`:`🟦 **Suas horas normais:** ${core.format(core.durationFor(mine))}`;
+  const status=`🟦 **Suas horas registradas:** ${core.format(core.durationFor(mine))}`;
   return present(i,ui.v2('📋 MEU CARTÃO',status+'\n\n'+ui.cardText(c),rows));
  }
  if(prefix==='monitor'){
@@ -459,12 +463,13 @@ async function onSelect(i){const [prefix,verb,arg]=i.customId.split(':');const g
   else if(verb==='log')s.shifts[arg].logChannelId=val[0]||null;
   else if(verb==='service')s.serviceRoleId=val[0]||null;
   else if(verb==='audit')s.auditChannelId=val[0]||null;
+   else if(verb==='presence'){s.presenceLogChannelId=val[0]||null;g.attendance.presenceReportStartedAt=Date.now();}
   else if(verb==='just-review')s.justifications.reviewChannelId=val[0]||null;
   else if(verb==='just-log')s.justifications.logChannelId=val[0]||null;
   else if(verb==='just-warning')s.justifications.warningChannelId=val[0]||null;
   else if(/^just-role-[123]$/.test(verb))s.justifications.warningRoles[Number(verb.slice(-1))-1]=val[0]||null;
   else return fail(i,'Campo desconhecido.');
-  store.save();return present(i,verb==='roles'||verb==='super'||verb==='log'?ui.shiftConfig(s,arg):/^just-role-[123]$/.test(verb)?ui.justificationRolesConfig(s):verb.startsWith('just-')?ui.justificationConfig(s):ui.config(s));
+  store.save();siteSync.requestUpdate(client);return present(i,verb==='roles'||verb==='super'||verb==='log'?ui.shiftConfig(s,arg):verb==='presence'?ui.presenceConfig(s):/^just-role-[123]$/.test(verb)?ui.justificationRolesConfig(s):verb.startsWith('just-')?ui.justificationConfig(s):ui.config(s));
  }
  return fail(i,'Seleção desconhecida.');
 }
@@ -476,17 +481,21 @@ async function onModal(i){const [prefix,verb,arg]=i.customId.split(':');const gu
  if(prefix==='just'&&verb==='submit'){
   if(!s.justifications.reviewChannelId)return fail(i,'O canal de análise ainda não foi configurado.');
   const dateInput=i.fields.getTextInputValue('day').trim(),reason=i.fields.getTextInputValue('reason').trim();
+   const count=Number(i.fields.getTextInputValue('days').trim());
+   if(!Number.isInteger(count)||count<1||count>60)return fail(i,'Informe de 1 a 60 dias de serviço.');
   const day=parseDateBR(dateInput);
   if(!day)return fail(i,'Informe uma data válida no formato DD/MM/AAAA (ex.: 07/11/2026).');
   const today=attend.localDay(Date.now(),s.timezone),oldest=attend.plusDays(today,-45);
-  if(day>today||day<oldest)return fail(i,'Justifique uma data de até 45 dias atrás, não futura.');
+  if(day>attend.plusDays(today,60)||day<oldest)return fail(i,'Data inicial deve estar entre 45 dias atrás e 60 dias à frente.');
   if(reason.length<10)return fail(i,'Explique a ausência com pelo menos 10 caracteres.');
   const actor=await member(guild,i.user.id);const shifts=Object.keys(core.SHIFTS).filter(k=>s.shifts[k].roleIds.some(id=>actor.roles.cache.has(id)));
   if(shifts.length!==1)return fail(i,shifts.length?'Seu perfil possui vários turnos. Peça ao responsável para ajustar seu cargo.':'Você precisa de um cargo de turno para justificar.');
   const shift=shifts[0];
-  if(Object.values(g.justifications).some(j=>j.userId===i.user.id&&j.date===day&&j.shift===shift&&j.status!=='rejected'))return fail(i,'Já existe justificativa pendente ou aprovada neste dia.');
+   const dates=attend.requestedDates(day,count,g.siteOff?.data,shift);
+   if(dates.at(-1)>attend.plusDays(today,120))return fail(i,'O período solicitado é muito longo.');
+  if(Object.values(g.justifications).some(j=>j.userId===i.user.id&&j.shift===shift&&j.status!=='rejected'&&dates.some(d=>j.date===d||j.dates?.includes(d))))return fail(i,'Já existe justificativa pendente ou aprovada em alguma data solicitada.');
   const id=`JST-${String(g.nextJustification++).padStart(6,'0')}`;
-  const j={id,userId:i.user.id,date:day,shift,reason,status:'pending',at:Date.now(),reviewerId:null,decidedAt:null};
+  const j={id,userId:i.user.id,date:dates[0],startDate:day,days:count,dates,shift,reason,status:'pending',at:Date.now(),reviewerId:null,decidedAt:null};
   const channel=await fetchText(guild,s.justifications.reviewChannelId,'de análise');
   await channel.send(ui.justificationReview(j));g.justifications[id]=j;store.save();
   await i.user.send({embeds:[ui.justificationDM(j)],allowedMentions:ui.mentions}).catch(()=>{});
@@ -574,7 +583,7 @@ async function handleDM(i){
    await audit(guild,{type:'Entrada da equipe',cardId:c.id,shift:c.shift,actorId:i.user.id,at:Date.now()});
    return respond(`✅ Equipe **${ui.safe(c.name)}** iniciou o serviço!`);
   }
-  const inv=c.joinInvites?.[i.user.id];if(!inv)return respond('Convite encerrado ou não destinado a você.');
+  const inv=c.joinInvites?.[i.user.id];if(!inv||inv.type!=='normal')return respond('Convite indisponível. Somente integrantes do turno podem entrar.');
   if(action==='yes'){
    const classified=core.allowedFor(g.settings.shifts,c.shift,rolesOf(target),inv.type);
    if(!classified||classified.originShift!==inv.originShift)return respond('Seu cargo do turno mudou. Solicite novo convite.');
@@ -583,8 +592,8 @@ async function handleDM(i){
    try{core.respondJoin(g,c,i.user.id,true);}catch(e){await changeRole(guild,c,[i.user.id],false);throw e;}
   }else core.respondJoin(g,c,i.user.id,false);
   store.save();siteSync.requestUpdate(client);await refreshCard(guild,c);
-  await audit(guild,{type:action==='yes'?(inv.type==='extra'?'Hora extra aceita':'Membro aceitou'):'Convite recusado',cardId:c.id,shift:c.shift,actorId:i.user.id,at:Date.now()});
-  return respond(action==='yes'?`✅ Você entrou na equipe ${ui.safe(c.name)} como ${inv.type==='extra'?'HORA EXTRA':'integrante normal'}. Contagem iniciada agora.`:'❌ Convite recusado.');
+  await audit(guild,{type:action==='yes'?'Membro aceitou':'Convite recusado',cardId:c.id,shift:c.shift,actorId:i.user.id,at:Date.now()});
+  return respond(action==='yes'?`✅ Você entrou na equipe ${ui.safe(c.name)} como integrante do turno. Contagem iniciada agora.`:'❌ Convite recusado.');
  }finally{locks.delete(c.id);}
 }
 async function syncGuild(guild){try{await guild.commands.set(commands.map(c=>c.toJSON()));console.log(`✅ /painelbateponto em ${guild.name}`);}catch(e){console.error(`Falha sincronização ${guild.id}:`,e.message);}}
@@ -653,4 +662,5 @@ process.on('unhandledRejection',e=>console.error('Rejeição inesperada:',e));
 process.on('uncaughtException',e=>console.error('Erro crítico:',e));
 siteSync.install(client);
 attendRuntime.install(client);
+presenceReports.install(client);
 client.login(token).catch(e=>{console.error('Falha no login:',e.message);process.exitCode=1;});

@@ -21,16 +21,17 @@ test('convites vencidos não são exibidos e aceites preservam regra de todos co
  assert.equal(all,true);assert.equal(inbox.pending(g,'chosen',NOW+2001).length,0);
  core.launch(c,NOW+3000);assert.equal(c.status,'active');
 });
-test('convite para entrar em equipe ativa mostra hora extra e origem corretas',()=>{
+test('convite para entrar em equipe ativa aceita apenas membros do mesmo turno',()=>{
  const g=setup(),c=initial(g);core.respondInvite(c,'chosen',true,NOW+1000);core.launch(c,NOW+2000);
- core.inviteJoin(g,c,'extra','owner',{type:'extra',originShift:'tarde'},NOW+3000);
- const own=inbox.pending(g,'extra',NOW+3100);
- assert.equal(own.length,1);assert.equal(own[0].kind,'join');assert.equal(own[0].type,'extra');assert.equal(own[0].originShift,'tarde');
+ assert.throws(()=>core.inviteJoin(g,c,'visitante','owner',{type:'extra',originShift:'tarde'},NOW+3000));
+ core.inviteJoin(g,c,'normal','owner',{type:'normal',originShift:'noite'},NOW+3000);
+ const own=inbox.pending(g,'normal',NOW+3100);
+ assert.equal(own.length,1);assert.equal(own[0].kind,'join');assert.equal(own[0].type,'normal');
  assert.equal(inbox.pending(g,'chosen',NOW+3100).length,0);
- assert.equal(inbox.pending(g,'extra',own[0].expiresAt+1).length,0);
- core.respondJoin(g,c,'extra',true,NOW+3200);
- assert.equal(inbox.pending(g,'extra',NOW+3300).length,0);
- assert.equal(c.members.find(x=>x.userId==='extra').type,'extra');
+ assert.equal(inbox.pending(g,'normal',own[0].expiresAt+1).length,0);
+ core.respondJoin(g,c,'normal',true,NOW+3200);
+ assert.equal(inbox.pending(g,'normal',NOW+3300).length,0);
+ assert.equal(c.members.find(x=>x.userId==='normal').type,'normal');
 });
 test('recusados desaparecem da lista sem iniciar cartão',()=>{
  const g=setup(),c=initial(g);core.respondInvite(c,'chosen',false,NOW+1000);

@@ -18,6 +18,8 @@ function normalize(input){
  if(c.maxMembers<c.minMembers)throw Error('O máximo de integrantes não pode ser menor que o mínimo');
  c.inviteMinutes=num(input.inviteMinutes,5,60,'Validade do convite');
  c.serviceRoleId=id(input.serviceRoleId,'Cargo em serviço');c.auditChannelId=id(input.auditChannelId,'Canal de auditoria');
+ c.presenceLogChannelId=id(input.presenceLogChannelId,'Canal de relatórios de presença');
+ c.presenceReportsEnabled=input.presenceReportsEnabled===undefined?true:bool(input.presenceReportsEnabled,'Relatórios de presença');
  c.notifications={pointDm:bool(input.notifications?.pointDm,'Notificações por DM'),receiptImage:false}; // Sem anexos no PV; ignora valores antigos recebidos do site.
  c.shifts={};for(const key of SHIFTS){const s=input.shifts?.[key];if(!s||!time(s.start)||!time(s.end))throw Error(`Horários inválidos: ${key}`);
   c.shifts[key]={start:s.start,end:s.end,roleIds:ids(s.roleIds,5,`Cargos de ${key}`),supervisorRoles:ids(s.supervisorRoles,5,`Responsáveis de ${key}`),logChannelId:id(s.logChannelId,`Logs de ${key}`)};
@@ -44,7 +46,7 @@ function assertResources(config,roles,channels,guildId){
  const availableRoles=new Set(roles.filter(r=>r.id!==guildId&&!r.managed).map(r=>r.id));
  const availableChannels=new Set(channels.filter(c=>[0,5].includes(c.type)).map(c=>c.id));
  const roleIds=[config.serviceRoleId,...config.justifications.warningRoles,...Object.values(config.shifts).flatMap(s=>[...s.roleIds,...s.supervisorRoles])].filter(Boolean);
- const channelIds=[config.auditChannelId,config.justifications.reviewChannelId,config.justifications.logChannelId,config.justifications.warningChannelId,...Object.values(config.shifts).map(s=>s.logChannelId)].filter(Boolean);
+ const channelIds=[config.auditChannelId,config.presenceLogChannelId,config.justifications.reviewChannelId,config.justifications.logChannelId,config.justifications.warningChannelId,...Object.values(config.shifts).map(s=>s.logChannelId)].filter(Boolean);
  if(roleIds.some(id=>!availableRoles.has(id)))throw Error('Há um cargo inválido, gerenciado ou de outro servidor');
  if(channelIds.some(id=>!availableChannels.has(id)))throw Error('Há um canal inválido ou de outro servidor');
 }

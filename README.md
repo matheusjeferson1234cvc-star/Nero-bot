@@ -1,4 +1,4 @@
-# CENTRAL DE HORAS — Bot v3.7.5
+# CENTRAL DE HORAS — Nero Bot v3.8.0
 
 Bot Discord.js de ponto por turnos, com equipes opcionais, PV por mensagem, convites no próprio servidor e painel web na Vercel.
 

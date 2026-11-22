@@ -37,7 +37,7 @@ function cardsFor(g){
   for(const m of card.members){
    if(!m.joinedAt)continue;
    const canceled=!!m.invalidation;
-   result.push({cardId:card.id+':'+m.userId,userId:m.userId,shift:keys[card.shift],originShift:keys[m.originShift]||keys[card.shift],kind:m.type==='extra'?'Extra':'Normal',status:canceled?'Cancelado':card.status==='ended'?'Validado':'Ativo',startedAt:new Date(m.joinedAt).toISOString(),endedAt:card.endedAt?new Date(card.endedAt).toISOString():null,durationMinutes:canceled?0:Math.floor(core.durationFor(m,now)/60000),cancellationReason:m.invalidation?.reason||null});
+   result.push({cardId:card.id+':'+m.userId,userId:m.userId,shift:keys[card.shift],originShift:keys[card.shift],kind:'Normal',status:canceled?'Cancelado':card.status==='ended'?'Validado':'Ativo',startedAt:new Date(m.joinedAt).toISOString(),endedAt:card.endedAt?new Date(card.endedAt).toISOString():null,durationMinutes:canceled?0:Math.floor(core.durationFor(m,now)/60000),cancellationReason:m.invalidation?.reason||null});
   }
  }
  return result;
