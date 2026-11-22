@@ -487,12 +487,12 @@ async function onModal(i){const [prefix,verb,arg]=i.customId.split(':');const gu
   if(!day)return fail(i,'Informe uma data válida no formato DD/MM/AAAA (ex.: 07/11/2026).');
   const today=attend.localDay(Date.now(),s.timezone),oldest=attend.plusDays(today,-45);
   if(day>attend.plusDays(today,60)||day<oldest)return fail(i,'Data inicial deve estar entre 45 dias atrás e 60 dias à frente.');
-   const dates=attend.requestedDates(day,count);
-   if(dates.at(-1)>attend.plusDays(today,120))return fail(i,'O período solicitado é muito longo.');
   if(reason.length<10)return fail(i,'Explique a ausência com pelo menos 10 caracteres.');
   const actor=await member(guild,i.user.id);const shifts=Object.keys(core.SHIFTS).filter(k=>s.shifts[k].roleIds.some(id=>actor.roles.cache.has(id)));
   if(shifts.length!==1)return fail(i,shifts.length?'Seu perfil possui vários turnos. Peça ao responsável para ajustar seu cargo.':'Você precisa de um cargo de turno para justificar.');
   const shift=shifts[0];
+   const dates=attend.requestedDates(day,count,g.siteOff?.data,shift);
+   if(dates.at(-1)>attend.plusDays(today,120))return fail(i,'O período solicitado é muito longo.');
   if(Object.values(g.justifications).some(j=>j.userId===i.user.id&&j.shift===shift&&j.status!=='rejected'&&dates.some(d=>j.date===d||j.dates?.includes(d))))return fail(i,'Já existe justificativa pendente ou aprovada em alguma data solicitada.');
   const id=`JST-${String(g.nextJustification++).padStart(6,'0')}`;
   const j={id,userId:i.user.id,date:dates[0],startDate:day,days:count,dates,shift,reason,status:'pending',at:Date.now(),reviewerId:null,decidedAt:null};
