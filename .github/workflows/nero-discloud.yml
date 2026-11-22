@@ -1,0 +1,33 @@
+name: Nero - Pacote Discloud
+on:
+  push:
+    branches:
+      - main
+      - feat/presenca-sem-hora-extra-20261122
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  preparar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Obter codigo
+        uses: actions/checkout@v4
+      - name: Configurar Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar dependencias
+        run: npm install --no-audit --no-fund
+      - name: Testar e verificar
+        run: npm run verify
+      - name: Montar ZIP da Discloud
+        run: |
+          zip -q -r Nero-Discloud-v3.8.0.zip index.js discloud.config package.json src assets
+          unzip -l Nero-Discloud-v3.8.0.zip | head -25
+      - name: Publicar pacote
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nero-Discloud-v3.8.0
+          path: Nero-Discloud-v3.8.0.zip
+          retention-days: 30
