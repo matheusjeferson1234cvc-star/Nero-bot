@@ -17,6 +17,7 @@ function normalize(input){
  c.minMembers=num(input.minMembers,2,4,'Mínimo da equipe');c.maxMembers=num(input.maxMembers,2,4,'Máximo da equipe');
  if(c.maxMembers<c.minMembers)throw Error('O máximo de integrantes não pode ser menor que o mínimo');
  c.inviteMinutes=num(input.inviteMinutes,5,60,'Validade do convite');
+ c.mandatoryMinutes=num(input.mandatoryMinutes??120,60,720,'Minutos obrigatórios');
  c.serviceRoleId=id(input.serviceRoleId,'Cargo em serviço');c.auditChannelId=id(input.auditChannelId,'Canal de auditoria');
  c.presenceLogChannelId=id(input.presenceLogChannelId,'Canal de relatórios de presença');
  c.presenceReportsEnabled=input.presenceReportsEnabled===undefined?true:bool(input.presenceReportsEnabled,'Relatórios de presença');
