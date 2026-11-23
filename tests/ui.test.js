@@ -131,7 +131,7 @@ test('auditoria de cancelamento destaca motivo, integrantes e cartão original',
 test('configuração separa turnos, equipe, auditoria e visual', () => {
   const view = ui.config(core.defaultSettings());
   const ids = view.components[0].components.flatMap(c => (c.components || []).map(x => x.customId)).filter(Boolean);
-  assert.deepEqual(ids, ['cfg:shifts','cfg:mode','cfg:rules','cfg:service','cfg:notify','cfg:audit','cfg:presence','cfg:logs','cfg:visual']);
+  assert.deepEqual(ids, ['cfg:shifts','cfg:mode','cfg:rules','cfg:mandatory','cfg:service','cfg:notify','cfg:audit','cfg:presence','cfg:logs','cfg:visual']);
   assert.equal(view.components[0].accent, ui.COLORS.purple);
 });
 
@@ -223,5 +223,15 @@ test('aba Logs Bate-Ponto lista canais e cria a estrutura em um clique', () => {
  assert.match(body, /LOGS BATE-PONTO/);
  assert.match(body, /Não configurado/);
  const ids=panel.components[0].components.flatMap(r => (r.components||[]).map(c => c.customId)).filter(Boolean);
- assert.deepEqual(ids, ['cfg:logs-create','bp:config']);
+ assert.deepEqual(ids, ['cfg:logs-create','cfg:logs','bp:config']);
+});
+
+test('configuração de horas obrigatórias mostra a mesma meta para os quatro turnos',()=>{
+ const settings=core.defaultSettings();
+ settings.mandatoryMinutes=180;
+ const panel=ui.mandatoryConfig(settings);
+ const body=flattened(panel.components[0]);
+ assert.match(body,/3 hora/);
+ const ids=panel.components[0].components.flatMap(r=>(r.components||[]).map(c=>c.customId)).filter(Boolean);
+ assert.deepEqual(ids,['cfg:mandatory-edit','bp:config']);
 });
