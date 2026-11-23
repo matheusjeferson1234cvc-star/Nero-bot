@@ -27,7 +27,7 @@ function minutesInShift(g,userId,date,shift){
 }
 function classifyMember(g,userId,date,shift,now){
  const minutes=minutesInShift(g,userId,date,shift);
- if(minutes>=120)return {status:'presentes',minutes};
+ if(minutes>=(g.settings.mandatoryMinutes||120))return {status:'presentes',minutes};
  const justification=attendance.sameDayReason(g,userId,date,shift);
  if(justification?.status==='approved')return {status:'justificados',minutes};
  if(justification?.status==='pending')return {status:'pendentes',minutes};
