@@ -45,7 +45,7 @@ function evaluation(g,{date,shift,userId,off,tz}){
  if(justification?.status==='approved')return {status:'justificada',minutes:0};
  if(justification?.status==='pending')return {status:'pendente',minutes:0};
  const minutes=workedMinutes(g,userId,date,tz);
- return {status:minutes>=120?'cumpriu':minutes>0?'incompleta':'falta',minutes};
+ return {status:minutes>=(g.settings.mandatoryMinutes||120)?'cumpriu':minutes>0?'incompleta':'falta',minutes};
 }
 function record(g,{date,shift,userId,off,tz},now=Date.now()){
  const key=`${date}:${userId}:${shift}`;
