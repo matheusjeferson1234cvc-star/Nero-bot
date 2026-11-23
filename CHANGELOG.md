@@ -1,3 +1,16 @@
+# Nero Bot V4 — Logs Bate-Ponto (23/11/2026)
+
+- Em **Bate-Ponto → Configurações → Logs Bate-Ponto**, a administração pode usar **Criar logs automaticamente**.
+- A criação gera a categoria privada **LOG BATE-PONTO** e oito canais: eventos gerais, quatro turnos, cancelamentos, presença e auditoria.
+- Canais existentes com o mesmo nome dentro da categoria são reutilizados. Clicar novamente não gera duplicatas.
+- As configurações do bot passam a apontar para os novos canais; cartões já registrados continuam nos canais antigos e mantêm o histórico.
+- Eventos de início, pausa, retorno e encerramento são copiados para **#logs-bate-ponto**; cancelamentos vão para **#logs-cancelamentos** e para a auditoria geral.
+- **#logs-presenca** recebe os relatórios já existentes de presença. Não é alterado o cálculo de horas, as metas ou o gerenciamento de equipes.
+- O bot precisa da permissão **Gerenciar Canais**. Administradores podem ver os logs; membros comuns não recebem acesso por padrão.
+- O código novo precisa ser testado no servidor e publicado na Discloud antes de entrar em produção.
+
+---
+
 # Central de Horas — Bot v3.7.5
 
 - A opção **Ativar equipes** está mais clara no menu de configurações do Discord, e a mesma opção pode ser salva no site.
