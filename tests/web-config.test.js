@@ -16,3 +16,13 @@ test('não aplica payload inválido que poderia corromper os cargos',()=>{
  const g=core.defaultGuild(),before=JSON.stringify(g.settings);
  assert.throws(()=>web.apply(g,{pointMode:'unknown'},1));assert.equal(JSON.stringify(g.settings),before);
 });
+
+test('site antigo sem meta não apaga meta obrigatória alterada pelo Discord',()=>{
+ const x=core.defaultGuild();
+ x.settings.mandatoryMinutes=180;
+ const old=schema.normalize(x.settings);
+ delete old.mandatoryMinutes;
+ const res=web.apply(x,old,1);
+ assert.equal(x.settings.mandatoryMinutes,180);
+ assert.equal(res.changed,false);
+});
