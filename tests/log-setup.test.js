@@ -71,3 +71,11 @@ test('sem Gerenciar Canais o bot não cria nada nem altera configuração',async
  assert.equal(channels.size,0);
  assert.equal(settings.logCategoryId,null);
 });
+
+test('canais de logs possuem emojis e nomes legados para migração',()=>{
+ const names=logs.LOG_CHANNELS.map(x=>x.name);
+ assert.ok(names.includes('🌙・logs-noite'));
+ assert.ok(names.includes('❌・logs-cancelamentos'));
+ assert.ok(logs.LOG_CHANNELS.every(x=>x.legacyName));
+ assert.match(logs.CATEGORY_NAME,/📁/);
+});
