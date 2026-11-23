@@ -15,6 +15,7 @@ const {sendReceiptDM}=require('./receipt-dm');
 const attendRuntime=require('./attendance-runtime');
 const presenceReports=require('./presence-reports');
 const panelSync=require('./panel-sync');
+const logSetup=require('./log-setup');
 const inbox=require('./invite-inbox');
 const token=process.env.DISCORD_TOKEN;
 if(!token){console.error('❌ Defina DISCORD_TOKEN nas variáveis privadas ou no arquivo .env.');process.exit(1);}
@@ -77,15 +78,23 @@ const activeMembers=c=>c.members.filter(m=>!m.invalidation).map(m=>m.userId);
 async function refreshCard(guild,card){try{if(!card.logChannelId||!card.logMessageId)return;
  const ch=await fetchText(guild,card.logChannelId,'de logs');const msg=await ch.messages.fetch(card.logMessageId);await msg.edit(ui.logCard(card));
  }catch(e){console.error(`Atualização do cartão ${card.id}:`,e.message);}}
-async function audit(guild,entry){const g=db(guild);g.audit.push(entry);store.save();if(!g.settings.auditChannelId)return false;
- try {
-  const ch = await fetchText(guild, g.settings.auditChannelId, 'de auditoria');
-  await ch.send(ui.auditLog(entry, g.cards[entry.cardId], guild.id));
-  return true;
- } catch (e) {
-  console.error('Auditoria registrada no banco, mas não publicada:', e.message);
-  return false;
+async function audit(guild,entry){
+ const g=db(guild);g.audit.push(entry);store.save();
+ const card=g.cards[entry.cardId],payload=ui.auditLog(entry,card,guild.id);
+ let published=false;
+ if(g.settings.auditChannelId)try{
+  const ch=await fetchText(guild,g.settings.auditChannelId,'de auditoria');
+  await ch.send(payload);published=true;
+ }catch(e){console.error('Auditoria salva, mas não publicada:',e.message);}
+ const eventTypes=new Set(['Início individual','Entrada da equipe','Pausa','Retorno','Encerramento','Cancelamento de horas']);
+ if(eventTypes.has(entry.type)){
+  const channelId=entry.type==='Cancelamento de horas'?g.settings.cancelLogChannelId:g.settings.pointEventsChannelId;
+  if(channelId&&channelId!==g.settings.auditChannelId)try{
+   const channel=await fetchText(guild,channelId,'do bate-ponto');
+   await channel.send(payload);
+  }catch(e){console.error('Log do ponto salvo, mas não publicado:',e.message);}
  }
+ return published;
 }
 async function refreshPublished(guild, ref, makePayload, label) {
  if (!ref?.channelId) return false;
@@ -349,6 +358,18 @@ async function onButton(i){const [prefix,verb,arg]=i.customId.split(':');const g
  }
  if(prefix==='cfg'){
   if(!(await isAdmin(i)))return fail(i,'Configuração restrita à administração.');
+  if(verb==='logs')return present(i,ui.logsConfig(s));
+  if(verb==='logs-create'){
+   const key='setup-logs:'+guild.id;
+   if(locks.has(key))return fail(i,'A criação de logs já está em andamento.');
+   locks.add(key);await defer(i);
+   try{
+    const result=await logSetup.createLogs(guild,s);
+    g.logsProvisionedRevision=Number.isInteger(g.siteConfigRevision)?g.siteConfigRevision:0;
+    store.save();siteSync.requestUpdate(client);
+    return present(i,ui.logsConfig(s,'✅ Logs prontos: '+result.created.length+' criados e '+result.reused.length+' reaproveitados.'));
+   }finally{locks.delete(key);}
+  }
   if(verb==='shifts')return present(i,ui.v2('TURNOS E CARGOS','Selecione um turno. Os cargos originais e a separação de membros permanecem preservados.',[
    ui.row(...Object.entries(core.SHIFTS).map(([k,label])=>ui.button(`cfg:turn:${k}`,label,ButtonStyle.Secondary))),
    ui.row(ui.button('bp:config','Voltar às configurações',ButtonStyle.Secondary))]));
