@@ -1,16 +1,16 @@
 'use strict';
 const { ChannelType, PermissionFlagsBits } = require('discord.js');
 
-const CATEGORY_NAME = 'LOG BATE-PONTO';
+const CATEGORY_NAME = '📁 LOG BATE-PONTO';
 const LOG_CHANNELS = Object.freeze([
-  { key: 'pointEventsChannelId', name: 'logs-bate-ponto', label: 'Eventos do ponto' },
-  { key: 'manha', name: 'logs-manha', label: 'Cartões da manhã' },
-  { key: 'tarde', name: 'logs-tarde', label: 'Cartões da tarde' },
-  { key: 'noite', name: 'logs-noite', label: 'Cartões da noite' },
-  { key: 'madrugada', name: 'logs-madrugada', label: 'Cartões da madrugada' },
-  { key: 'cancelLogChannelId', name: 'logs-cancelamentos', label: 'Cancelamentos' },
-  { key: 'presenceLogChannelId', name: 'logs-presenca', label: 'Presença' },
-  { key: 'auditChannelId', name: 'auditoria-geral', label: 'Auditoria geral' }
+  { key: 'pointEventsChannelId', name: '📌・logs-bate-ponto', legacyName: 'logs-bate-ponto', label: '📌 Eventos do ponto' },
+  { key: 'manha', name: '🌅・logs-manha', legacyName: 'logs-manha', label: '🌅 Manhã' },
+  { key: 'tarde', name: '☀️・logs-tarde', legacyName: 'logs-tarde', label: '☀️ Tarde' },
+  { key: 'noite', name: '🌙・logs-noite', legacyName: 'logs-noite', label: '🌙 Noite' },
+  { key: 'madrugada', name: '🌌・logs-madrugada', legacyName: 'logs-madrugada', label: '🌌 Madrugada' },
+  { key: 'cancelLogChannelId', name: '❌・logs-cancelamentos', legacyName: 'logs-cancelamentos', label: '❌ Cancelamentos' },
+  { key: 'presenceLogChannelId', name: '📋・logs-presenca', legacyName: 'logs-presenca', label: '📋 Presença' },
+  { key: 'auditChannelId', name: '🛡️・auditoria-geral', legacyName: 'auditoria-geral', label: '🛡️ Auditoria geral' }
 ]);
 
 function channelId(settings, key) {
@@ -50,7 +50,7 @@ async function createLogs(guild, settings) {
   let channels = await guild.channels.fetch();
   let category = channels.get(settings.logCategoryId) || null;
   if (category?.type !== ChannelType.GuildCategory) category = null;
-  if (!category) category = channels.find(c => c.type === ChannelType.GuildCategory && c.name === CATEGORY_NAME);
+  if (!category) category = channels.find(c => c.type === ChannelType.GuildCategory && (c.name === CATEGORY_NAME || c.name === 'LOG BATE-PONTO'));
   const created = [], reused = [];
   if (!category) {
     category = await guild.channels.create({
@@ -74,7 +74,7 @@ async function createLogs(guild, settings) {
   const result = {};
   for (const item of LOG_CHANNELS) {
     let channel = channels.find(c =>
-      c.type === ChannelType.GuildText && c.parentId === category.id && c.name === item.name
+      c.type === ChannelType.GuildText && c.parentId === category.id && (c.name === item.name || c.name === item.legacyName)
     );
     if (!channel) {
       channel = await guild.channels.create({
@@ -83,6 +83,8 @@ async function createLogs(guild, settings) {
       });
       created.push('#' + item.name);
     } else {
+      if (channel.name === item.legacyName && typeof channel.setName === 'function')
+        await channel.setName(item.name, 'Nero Bot V4: identificar logs com emojis');
       await channel.permissionOverwrites.edit(guild.roles.everyone, { ViewChannel: false }, {
         reason: 'Manter logs privados do Nero Bot'
       });
