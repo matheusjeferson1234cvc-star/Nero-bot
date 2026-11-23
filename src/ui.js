@@ -269,9 +269,9 @@ function logsConfig(settings, notice = '') {
     '• **' + item.label + ':** ' + (item.id ? '<#' + item.id + '>' : 'Não configurado')
   );
   return v2('📁 LOGS BATE-PONTO',
-    (notice ? '**' + safe(notice) + '**\\n\\n' : '') +
-    '**Categoria:** ' + (settings.logCategoryId ? '<#' + settings.logCategoryId + '>' : 'Não criada') + '\\n\\n' +
-    lines.join('\\n') + '\\n\\n' +
+    (notice ? '**' + safe(notice) + '**\n\n' : '') +
+    '**Categoria:** ' + (settings.logCategoryId ? '<#' + settings.logCategoryId + '>' : 'Não criada') + '\n\n' +
+    lines.join('\n') + '\n\n' +
     '-# A criação monta os canais privados e liga os logs automaticamente. Cartões antigos continuam com seus registros originais.',
     [row(button('cfg:logs-create', 'Criar logs automaticamente', ButtonStyle.Success, '📁')),
       row(button('bp:config', 'Voltar às configurações', ButtonStyle.Secondary, '↩️'))],
