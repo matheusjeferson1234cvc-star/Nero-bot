@@ -4,6 +4,7 @@ on:
     branches:
       - main
       - feat/presenca-sem-hora-extra-20261122
+      - feat/v4-logs-bate-ponto-automativo
   workflow_dispatch:
 permissions:
   contents: read
@@ -25,11 +26,11 @@ jobs:
           node --test tests/core.test.js tests/attendance.test.js tests/presence-reports.test.js tests/ui.test.js tests/log-setup.test.js tests/invite-inbox.test.js tests/web-config.test.js tests/panel-sync.test.js tests/receipt-dm.test.js tests/receipt.test.js tests/warnings.test.js tests/date-br.test.js
       - name: Montar ZIP da Discloud
         run: |
-          zip -q -r Nero-Discloud-v3.8.0.zip index.js discloud.config package.json src assets
-          unzip -l Nero-Discloud-v3.8.0.zip | head -25
+          zip -q -r Nero-Discloud-v4.0.0.zip index.js discloud.config package.json src assets
+          unzip -l Nero-Discloud-v4.0.0.zip | head -25
       - name: Publicar pacote
         uses: actions/upload-artifact@v4
         with:
-          name: Nero-Discloud-v3.8.0
-          path: Nero-Discloud-v3.8.0.zip
+          name: Nero-Discloud-v4.0.0
+          path: Nero-Discloud-v4.0.0.zip
           retention-days: 30
