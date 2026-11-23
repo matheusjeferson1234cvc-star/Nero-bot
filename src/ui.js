@@ -1,4 +1,5 @@
 'use strict';
+const logSetup = require('./log-setup');
 
 const path = require('node:path');
 const {
@@ -260,7 +261,20 @@ function config(settings) {
       row(button('cfg:rules', 'Equipe e convites', ButtonStyle.Secondary, '📨'), button('cfg:service', 'Cargo em serviço', ButtonStyle.Secondary, '🏷️')),
       row(button('cfg:notify', 'Notificações e PV', ButtonStyle.Secondary, '🔔'), button('cfg:audit', 'Auditoria', ButtonStyle.Secondary, '🛡️')),
        row(button('cfg:presence','Logs de presença',ButtonStyle.Primary,'📋')),
-      row(button('cfg:visual', 'Aparência e banner', ButtonStyle.Secondary, '🎨'))],
+      row(button('cfg:logs', 'Logs Bate-Ponto', ButtonStyle.Primary, '📁'), button('cfg:visual', 'Aparência e banner', ButtonStyle.Secondary, '🎨'))],
+    true, 'purple');
+}
+function logsConfig(settings, notice = '') {
+  const lines = logSetup.status(settings).map(item =>
+    '• **' + item.label + ':** ' + (item.id ? '<#' + item.id + '>' : 'Não configurado')
+  );
+  return v2('📁 LOGS BATE-PONTO',
+    (notice ? '**' + safe(notice) + '**\\n\\n' : '') +
+    '**Categoria:** ' + (settings.logCategoryId ? '<#' + settings.logCategoryId + '>' : 'Não criada') + '\\n\\n' +
+    lines.join('\\n') + '\\n\\n' +
+    '-# A criação monta os canais privados e liga os logs automaticamente. Cartões antigos continuam com seus registros originais.',
+    [row(button('cfg:logs-create', 'Criar logs automaticamente', ButtonStyle.Success, '📁')),
+      row(button('bp:config', 'Voltar às configurações', ButtonStyle.Secondary, '↩️'))],
     true, 'purple');
 }
 function teamMenu(c) {
@@ -418,6 +432,6 @@ function warningLog(w){return v2(w.status==='revoked'?'ADVERTÊNCIA REVOGADA':'A
  w.status==='active'?[row(button(`warn:revoke:${w.id}`,'Revisar / revogar',ButtonStyle.Secondary))]:[],false,w.status==='revoked'?'slate':'red')}
 module.exports = {
   COLORS, safe, mentions, row, button, v2, msg, panel, cardText, logCard, auditLog,
-  inviteDM, dmOutcome, select, roleSelect, channelSelect, config, shiftConfig, notificationsConfig,justificationRolesConfig,
+  inviteDM, dmOutcome, select, roleSelect, channelSelect, config, shiftConfig, logsConfig, notificationsConfig,justificationRolesConfig,
   teamMenu, candidateView, stat,modeConfig,presenceConfig,justificationPanel,justificationConfig,justificationReview,justificationDecisionLog,justificationDM,warningDM,warningLog,pointReceipt,receiptPhotoEmbed,receiptActions
 };
