@@ -15,6 +15,7 @@ const {sendReceiptDM}=require('./receipt-dm');
 const attendRuntime=require('./attendance-runtime');
 const presenceReports=require('./presence-reports');
 const panelSync=require('./panel-sync');
+const logSetup=require('./log-setup');
 const inbox=require('./invite-inbox');
 const token=process.env.DISCORD_TOKEN;
 if(!token){console.error('❌ Defina DISCORD_TOKEN nas variáveis privadas ou no arquivo .env.');process.exit(1);}
@@ -74,18 +75,71 @@ async function changeRole(guild,card,userIds,apply){const roleId=card.serviceRol
  }catch(e){for(const {m,had} of altered.reverse())try{await (had?m.roles.add(roleId,'Reversão'):m.roles.remove(roleId,'Reversão'));}catch{}throw e;}
 }
 const activeMembers=c=>c.members.filter(m=>!m.invalidation).map(m=>m.userId);
+async function sendClosedReceipts(guild,c){
+ const settings=setting(guild);
+ if(settings.notifications?.pointDm===false)return;
+ for(const m of c.members){
+  if(m.invalidation)continue;
+  try{
+   const guildMember=await guild.members.fetch(m.userId).catch(()=>null);
+   const user=guildMember?.user||await client.users.fetch(m.userId);
+   const result=await sendReceiptDM({
+    user,card:c,member:m,timezone:settings.timezone,notifications:settings.notifications,
+    displayName:guildMember?.displayName||user.globalName||user.username||'Membro',
+    username:user.username,
+    avatarUrls:[guildMember?.displayAvatarURL({extension:'png',size:256,forceStatic:true}),
+     user.displayAvatarURL({extension:'png',size:256,forceStatic:true}),user.defaultAvatarURL].filter(Boolean),
+    logger:console
+   });
+   if(result.mode==='dm-blocked')console.warn('[Comprovante] PV indisponível para',m.userId);
+  }catch(err){console.warn('Comprovante não enviado para',m.userId,err.message)}
+ }
+}
+// Verificação periódica também funciona se ninguém abrir o painel no Discord.
+let runningAutoClose=false;
+async function autoCloseAll(){
+ if(runningAutoClose)return;runningAutoClose=true;
+ try{
+  for(const guild of client.guilds.cache.values())for(const c of core.list(db(guild))){
+   if(!core.autoCloseDue(c)||locks.has(c.id))continue;
+   locks.add(c.id);
+   try{
+    const now=Date.now();
+    if(!core.autoCloseDue(c,now))continue;
+    core.finish(c,c.leaderId,now);
+    c.history.push({event:'auto_closed',at:now,requiredMinutes:c.requiredMinutes});
+    store.save();siteSync.requestUpdate(client);
+    await changeRole(guild,c,activeMembers(c),false).catch(e=>console.error('Remover cargo no encerramento automático:',e.message));
+    await refreshCard(guild,c);
+    await audit(guild,{type:'Encerramento automático',cardId:c.id,shift:c.shift,actorId:c.leaderId,
+     reason:'Meta de '+core.format(c.requiredMinutes*60000)+' concluída por todos os participantes válidos.',at:now});
+    await sendClosedReceipts(guild,c);
+    console.log('[Ponto automático]',guild.id,c.id,'meta',c.requiredMinutes,'minutos');
+   }catch(err){console.error('Falha ao finalizar ponto automático:',c.id,err.message)}
+   finally{locks.delete(c.id);}
+  }
+ }finally{runningAutoClose=false;}
+}
 async function refreshCard(guild,card){try{if(!card.logChannelId||!card.logMessageId)return;
  const ch=await fetchText(guild,card.logChannelId,'de logs');const msg=await ch.messages.fetch(card.logMessageId);await msg.edit(ui.logCard(card));
  }catch(e){console.error(`Atualização do cartão ${card.id}:`,e.message);}}
-async function audit(guild,entry){const g=db(guild);g.audit.push(entry);store.save();if(!g.settings.auditChannelId)return false;
- try {
-  const ch = await fetchText(guild, g.settings.auditChannelId, 'de auditoria');
-  await ch.send(ui.auditLog(entry, g.cards[entry.cardId], guild.id));
-  return true;
- } catch (e) {
-  console.error('Auditoria registrada no banco, mas não publicada:', e.message);
-  return false;
+async function audit(guild,entry){
+ const g=db(guild);g.audit.push(entry);store.save();
+ const card=g.cards[entry.cardId],payload=ui.auditLog(entry,card,guild.id);
+ let published=false;
+ if(g.settings.auditChannelId)try{
+  const ch=await fetchText(guild,g.settings.auditChannelId,'de auditoria');
+  await ch.send(payload);published=true;
+ }catch(e){console.error('Auditoria salva, mas não publicada:',e.message);}
+ const eventTypes=new Set(['Início individual','Entrada da equipe','Pausa','Retorno','Encerramento','Encerramento automático','Cancelamento de horas']);
+ if(eventTypes.has(entry.type)){
+  const channelId=entry.type==='Cancelamento de horas'?g.settings.cancelLogChannelId:g.settings.pointEventsChannelId;
+  if(channelId&&channelId!==g.settings.auditChannelId)try{
+   const channel=await fetchText(guild,channelId,'do bate-ponto');
+   await channel.send(payload);
+  }catch(e){console.error('Log do ponto salvo, mas não publicado:',e.message);}
  }
+ return published;
 }
 async function refreshPublished(guild, ref, makePayload, label) {
  if (!ref?.channelId) return false;
@@ -263,21 +317,7 @@ async function onButton(i){const [prefix,verb,arg]=i.customId.split(':');const g
    else if(verb==='end'){if(!['active','paused'].includes(c.status))throw Error('Ponto não está em andamento.');await changeRole(guild,c,activeMembers(c),false);core.finish(c,i.user.id);}
    else throw Error('Ação desconhecida.');
    store.save();siteSync.requestUpdate(client);await refreshCard(guild,c);await audit(guild,{type:{abort:'Cancelamento de convite',pause:'Pausa',resume:'Retorno',end:'Encerramento'}[verb],cardId:c.id,shift:c.shift,actorId:i.user.id,at:Date.now()});
-   if(verb==='end'&&s.notifications?.pointDm!==false)for(const m of c.members){
-    try{
-     const guildMember=await guild.members.fetch(m.userId).catch(()=>null);
-     const user=guildMember?.user||await client.users.fetch(m.userId);
-     const result=await sendReceiptDM({
-       user,card:c,member:m,timezone:s.timezone,notifications:s.notifications,
-       displayName:guildMember?.displayName||user.globalName||user.username||'Membro',
-       username:user.username,
-       avatarUrls:[guildMember?.displayAvatarURL({extension:'png',size:256,forceStatic:true}),
-         user.displayAvatarURL({extension:'png',size:256,forceStatic:true}),user.defaultAvatarURL].filter(Boolean),
-       logger:console
-     });
-     if(result.mode==='dm-blocked')console.warn(`[Comprovante] O membro ${m.userId} não recebe PV. Cartão encerrado normalmente.`);
-    }catch(e){console.warn('Comprovante em DM não enviado para',m.userId,e.message)}
-   }
+   if(verb==='end')await sendClosedReceipts(guild,c);
    return present(i,ui.v2('✅ OPERAÇÃO CONCLUÍDA',ui.cardText(c)));
   }finally{locks.delete(c.id);}
  }
@@ -349,6 +389,21 @@ async function onButton(i){const [prefix,verb,arg]=i.customId.split(':');const g
  }
  if(prefix==='cfg'){
   if(!(await isAdmin(i)))return fail(i,'Configuração restrita à administração.');
+  if(verb==='mandatory')return present(i,ui.mandatoryConfig(s));
+  if(verb==='mandatory-edit')return i.showModal(modal('mod:mandatory:all','Horas obrigatórias globais',[
+   {id:'hours',label:'Horas obrigatórias (1 a 12)',value:String(s.mandatoryMinutes/60),max:2}]));
+  if(verb==='logs')return present(i,ui.logsConfig(s));
+  if(verb==='logs-create'){
+   const key='setup-logs:'+guild.id;
+   if(locks.has(key))return fail(i,'A criação de logs já está em andamento.');
+   locks.add(key);await defer(i);
+   try{
+    const result=await logSetup.createLogs(guild,s);
+    g.logsProvisionedRevision=Number.isInteger(g.siteConfigRevision)?g.siteConfigRevision:0;
+    store.save();siteSync.requestUpdate(client);
+    return present(i,ui.logsConfig(s,'✅ Logs prontos: '+result.created.length+' criados e '+result.reused.length+' reaproveitados.'));
+   }finally{locks.delete(key);}
+  }
   if(verb==='shifts')return present(i,ui.v2('TURNOS E CARGOS','Selecione um turno. Os cargos originais e a separação de membros permanecem preservados.',[
    ui.row(...Object.entries(core.SHIFTS).map(([k,label])=>ui.button(`cfg:turn:${k}`,label,ButtonStyle.Secondary))),
    ui.row(ui.button('bp:config','Voltar às configurações',ButtonStyle.Secondary))]));
@@ -519,6 +574,12 @@ async function onModal(i){const [prefix,verb,arg]=i.customId.split(':');const gu
  }
  if(prefix==='mod'){
   if(!(await isAdmin(i)))return fail(i,'Somente administradores podem configurar.');
+  if(verb==='mandatory'){
+   const hours=Number(i.fields.getTextInputValue('hours').trim());
+   if(!Number.isInteger(hours)||hours<1||hours>12)return fail(i,'Escolha entre 1 e 12 horas inteiras.');
+   s.mandatoryMinutes=hours*60;store.save();siteSync.requestUpdate(client);
+   return present(i,ui.mandatoryConfig(s));
+  }
   if(verb==='hours'){core.timeMinute(i.fields.getTextInputValue('start'));core.timeMinute(i.fields.getTextInputValue('end'));
    s.shifts[arg].start=i.fields.getTextInputValue('start');s.shifts[arg].end=i.fields.getTextInputValue('end');store.save();return present(i,ui.shiftConfig(s,arg));}
   if(verb==='rules'){
@@ -597,7 +658,7 @@ async function handleDM(i){
  }finally{locks.delete(c.id);}
 }
 async function syncGuild(guild){try{await guild.commands.set(commands.map(c=>c.toJSON()));console.log(`✅ /painelbateponto em ${guild.name}`);}catch(e){console.error(`Falha sincronização ${guild.id}:`,e.message);}}
-client.once(Events.ClientReady,async()=>{console.log(`✅ Central de Ponto conectada como ${client.user.tag}`);for(const guild of client.guilds.cache.values()){await syncGuild(guild);await refreshAllPanels(guild);}});
+client.once(Events.ClientReady,async()=>{console.log(`✅ Central de Ponto conectada como ${client.user.tag}`);for(const guild of client.guilds.cache.values()){await syncGuild(guild);await refreshAllPanels(guild);}await autoCloseAll();});
 client.on(Events.GuildCreate,async guild=>{await syncGuild(guild);await refreshAllPanels(guild);});
 client.on(Events.InteractionCreate,async i=>{
  try{
@@ -663,4 +724,5 @@ process.on('uncaughtException',e=>console.error('Erro crítico:',e));
 siteSync.install(client);
 attendRuntime.install(client);
 presenceReports.install(client);
+setInterval(()=>autoCloseAll().catch(err=>console.error('Ponto automático:',err.message)),15000).unref?.();
 client.login(token).catch(e=>{console.error('Falha no login:',e.message);process.exitCode=1;});

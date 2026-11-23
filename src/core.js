@@ -7,7 +7,7 @@ function defaultSettings(){
  const windows={manha:['06:00','12:00'],tarde:['12:00','18:00'],noite:['18:00','00:00'],madrugada:['00:00','06:00']};
  return {
   notifications:{pointDm:true,receiptImage:false},
-  timezone:'America/Sao_Paulo',pointMode:'team',serviceRoleId:null,auditChannelId:null,presenceLogChannelId:null,presenceReportsEnabled:true,inviteMinutes:15,minMembers:2,maxMembers:4,
+  timezone:'America/Sao_Paulo',pointMode:'team',serviceRoleId:null,auditChannelId:null,presenceLogChannelId:null,logCategoryId:null,pointEventsChannelId:null,cancelLogChannelId:null,presenceReportsEnabled:true,mandatoryMinutes:120,inviteMinutes:15,minMembers:2,maxMembers:4,
   justifications:{reviewChannelId:null,logChannelId:null,warningChannelId:null,warningRoles:[null,null,null],panel:null,autoWarnings:false,panelVisual:{title:'Justificativa de ausência',description:'Solicite a análise de uma ausência pela Central de Horas.',customGif:null}},
   shifts:Object.fromEntries(Object.entries(windows).map(([id,[start,end]])=>[id,{start,end,roleIds:[],supervisorRoles:[],logChannelId:null}])),
   panel:{title:'🕒 CENTRAL DE PONTO',description:'🟢 **Iniciar / Encerrar** · Monte a equipe e registre o serviço.\n⏯️ **Pausar / Retornar** · Controle a contagem de horas.\n👥 **Gerenciar equipe** · Convide membros do seu turno.\n📋 **Meus pontos** · Consulte cartões e tempo trabalhado.',customGif:null,published:null}
@@ -31,6 +31,7 @@ function padGuild(g){
  g.settings.justifications.panelVisual={...base.justifications.panelVisual,...(existing.justifications?.panelVisual||{})};
  if(!Array.isArray(g.settings.justifications.warningRoles)||g.settings.justifications.warningRoles.length!==3)g.settings.justifications.warningRoles=[null,null,null];
  if(!['team','individual'].includes(g.settings.pointMode))g.settings.pointMode='team';
+ if(!Number.isInteger(g.settings.mandatoryMinutes)||g.settings.mandatoryMinutes<60||g.settings.mandatoryMinutes>720)g.settings.mandatoryMinutes=120;
  // Migrar apenas títulos/descrições originais; preservar personalização do administrador.
  if(g.settings.panel.title==='⏱️ Central de Bate-Ponto')g.settings.panel.title=base.panel.title;
  if(g.settings.panel.description==='👥 Monte sua equipe, aguarde os aceites e acompanhe suas horas por turno.')g.settings.panel.description=base.panel.description;
@@ -74,7 +75,7 @@ function createCard(g,{shift,name,leaderId,invitees,now=Date.now()}){
  const id=`BP-${String(g.nextNumber++).padStart(6,'0')}`;
  const members=[leaderId,...invitees].map(userId=>({userId,accepted:userId===leaderId,joinedAt:null,segments:[],type:'normal',originShift:shift,invalidation:null}));
  const card={id,shift,name,leaderId,status:'pending',members,createdAt:now,expiresAt:now+s.inviteMinutes*60000,startedAt:null,endedAt:null,pausedAt:null,
- logChannelId:s.shifts[shift].logChannelId,logMessageId:null,serviceRoleId:s.serviceRoleId,joinInvites:{},history:[{event:'created',at:now,actor:leaderId}]};
+ logChannelId:s.shifts[shift].logChannelId,logMessageId:null,serviceRoleId:s.serviceRoleId,requiredMinutes:s.mandatoryMinutes,joinInvites:{},history:[{event:'created',at:now,actor:leaderId}]};
  g.cards[id]=card;return card;
 }
 function createSoloCard(g,{shift,leaderId,now=Date.now()}){
@@ -82,7 +83,7 @@ function createSoloCard(g,{shift,leaderId,now=Date.now()}){
  if(busy(g,leaderId,now)||pendingInvitation(g,leaderId,now))throw Error('Você já possui ponto ou convite ativo.');
  const id=`BP-${String(g.nextNumber++).padStart(6,'0')}`;
  const m={userId:leaderId,accepted:true,joinedAt:now,segments:[{start:now,end:null}],type:'normal',originShift:shift,invalidation:null};
- const card={id,shift,name:'Ponto individual',leaderId,status:'active',members:[m],createdAt:now,expiresAt:now,startedAt:now,endedAt:null,pausedAt:null,logChannelId:g.settings.shifts[shift].logChannelId,logMessageId:null,serviceRoleId:g.settings.serviceRoleId,joinInvites:{},history:[{event:'solo_started',at:now,actor:leaderId}]};
+ const card={id,shift,name:'Ponto individual',leaderId,status:'active',members:[m],createdAt:now,expiresAt:now,startedAt:now,endedAt:null,pausedAt:null,logChannelId:g.settings.shifts[shift].logChannelId,logMessageId:null,serviceRoleId:g.settings.serviceRoleId,requiredMinutes:g.settings.mandatoryMinutes,joinInvites:{},history:[{event:'solo_started',at:now,actor:leaderId}]};
  g.cards[id]=card;return card;
 }
 function respondInvite(card,userId,accepted,now=Date.now()){
@@ -131,6 +132,12 @@ function respondJoin(g,card,userId,accepted,now=Date.now()){
  card.history.push({event:accepted?'joined':'join_declined',at:now,actor:userId,type:invite.type});return card;
 }
 function recordedFor(member,now=Date.now()){return (member.segments||[]).reduce((total,s)=>total+Math.max(0,(s.end??now)-s.start),0);}
+// Aplica somente a cartões novos (os anteriores não têm requiredMinutes).
+function autoCloseDue(card,now=Date.now()){
+ if(!['active','paused'].includes(card.status)||!Number.isInteger(card.requiredMinutes)||card.requiredMinutes<60)return false;
+ const valid=card.members.filter(m=>m.joinedAt&&!m.invalidation&&m.type!=='extra');
+ return valid.length>0&&valid.every(m=>recordedFor(m,now)>=card.requiredMinutes*60000);
+}
 function durationFor(member,now=Date.now()){return member.invalidation?0:recordedFor(member,now);}
 function cancelHours(card,users,{actor,reason,now=Date.now()}){
  reason=String(reason||'').trim();if(reason.length<5||reason.length>500)throw Error('Informe motivo de 5 a 500 caracteres.');
@@ -173,4 +180,4 @@ function ranking(g,now=Date.now()){
  return [...result.values()].sort((a,b)=>b.total-a.total);
 }
 function format(ms){return `${Math.floor(ms/3600000)}h ${String(Math.floor((ms%3600000)/60000)).padStart(2,'0')}m`;}
-module.exports={SHIFTS,OPEN,defaultSettings,defaultGuild,padGuild,timeMinute,localMinutes,onShift,classify,allowedFor,list,busy,pendingInvitation,candidateEligible,expire,createCard,createSoloCard,respondInvite,launch,pause,resume,finish,inviteJoin,respondJoin,recordedFor,durationFor,cancelHours,totalFor,hoursForUser,ranking,format};
+module.exports={SHIFTS,OPEN,defaultSettings,defaultGuild,padGuild,timeMinute,localMinutes,onShift,classify,allowedFor,list,busy,pendingInvitation,candidateEligible,expire,createCard,createSoloCard,respondInvite,launch,pause,resume,finish,inviteJoin,respondJoin,recordedFor,autoCloseDue,durationFor,cancelHours,totalFor,hoursForUser,ranking,format};

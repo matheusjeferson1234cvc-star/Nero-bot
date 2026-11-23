@@ -49,3 +49,11 @@ test('folga quebra a sequência de faltas, evitando advertência por dias não c
  assert.equal(calc.streakStep(1,'cumpriu').streak,0);
  assert.equal(calc.streakStep(1,'falta').streak,2);
 });
+
+test('avaliação usa meta global de 3h em todos os turnos',()=>{
+ const x=g(),t=Date.parse('2026-11-10T15:00:00Z');
+ x.settings.mandatoryMinutes=180;
+ const c=core.createSoloCard(x,{shift:'tarde',leaderId:'1',now:t});
+ core.finish(c,'1',t+150*60000);
+ assert.equal(a.evaluation(x,{date:'2026-11-10',shift:'tarde',userId:'1',tz:'America/Sao_Paulo',off:{weekly:{all:[0]},dates:[]}}).status,'incompleta');
+});

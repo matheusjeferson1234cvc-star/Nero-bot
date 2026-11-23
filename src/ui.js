@@ -1,4 +1,5 @@
 'use strict';
+const logSetup = require('./log-setup');
 
 const path = require('node:path');
 const {
@@ -249,6 +250,7 @@ function config(settings) {
     `> Ajustes do servidor • ${count}/4 turnos com cargos e logs configurados\n\n` +
     `### Jornada e equipes\n` +
     `**Modalidade:** ${settings.pointMode === 'individual' ? 'Individual' : 'Equipe'}\n` +
+    `**⏱️ Horas obrigatórias (todos os turnos):** ${settings.mandatoryMinutes/60}h\n` +
     `**Equipe:** ${settings.minMembers}–${settings.maxMembers} integrantes · Convite: ${settings.inviteMinutes} min\n\n` +
     `### Segurança e registro\n` +
     `**Fuso horário:** ${safe(settings.timezone)}\n` +
@@ -257,10 +259,35 @@ function config(settings) {
      `**📋 Logs de presença:** ${settings.presenceLogChannelId ? `<#${settings.presenceLogChannelId}>` : 'Não configurado'} · ${settings.presenceReportsEnabled?'Ativado':'Desativado'}\n\n` +
     `-# Justificativas e advertências são configuradas no painel /paineljustificativas. Fiscalização: /fiscalizarponto.`,
     [row(button('cfg:shifts', 'Turnos e cargos', ButtonStyle.Primary, '🕒'), button('cfg:mode', 'Ativar equipes', ButtonStyle.Secondary, '👥')),
-      row(button('cfg:rules', 'Equipe e convites', ButtonStyle.Secondary, '📨'), button('cfg:service', 'Cargo em serviço', ButtonStyle.Secondary, '🏷️')),
-      row(button('cfg:notify', 'Notificações e PV', ButtonStyle.Secondary, '🔔'), button('cfg:audit', 'Auditoria', ButtonStyle.Secondary, '🛡️')),
-       row(button('cfg:presence','Logs de presença',ButtonStyle.Primary,'📋')),
-      row(button('cfg:visual', 'Aparência e banner', ButtonStyle.Secondary, '🎨'))],
+      row(button('cfg:rules', 'Equipe e convites', ButtonStyle.Secondary, '📨'), button('cfg:mandatory','Horas obrigatórias',ButtonStyle.Primary,'⏱️')),
+      row(button('cfg:service', 'Cargo em serviço', ButtonStyle.Secondary, '🏷️'), button('cfg:notify', 'Notificações e PV', ButtonStyle.Secondary, '🔔')),
+      row(button('cfg:audit', 'Auditoria', ButtonStyle.Secondary, '🛡️'), button('cfg:presence','Logs de presença',ButtonStyle.Primary,'📋')),
+      row(button('cfg:logs', 'Logs Bate-Ponto', ButtonStyle.Primary, '📁'), button('cfg:visual', 'Aparência e banner', ButtonStyle.Secondary, '🎨'))],
+    true, 'purple');
+}
+function mandatoryConfig(settings) {
+ return v2('⏱️ HORAS OBRIGATÓRIAS',
+  '**Meta global:** '+settings.mandatoryMinutes/60+' hora(s)\\n\\n' +
+  'A meta é igual nos turnos 🌅 Manhã, ☀️ Tarde, 🌙 Noite e 🌌 Madrugada.\\n' +
+  '✅ Ponto individual encerra sozinho ao cumprir a meta.\\n' +
+  '👥 Ponto em equipe encerra quando todos os integrantes válidos cumprirem a meta.\\n' +
+  '⏸️ Tempo pausado não conta.\\n\\n' +
+  '-# Esta configuração vale para cartões criados depois da alteração. Histórico anterior preservado.',
+  [row(button('cfg:mandatory-edit', 'Alterar meta obrigatória', ButtonStyle.Primary, '⚙️')),
+   row(button('bp:config','Voltar às configurações', ButtonStyle.Secondary, '↩️'))], true, 'purple');
+}
+function logsConfig(settings, notice = '') {
+  const lines = logSetup.status(settings).map(item =>
+    '• **' + item.label + ':** ' + (item.id ? '<#' + item.id + '>' : 'Não configurado')
+  );
+  return v2('📁 LOGS BATE-PONTO',
+    (notice ? '**' + safe(notice) + '**\n\n' : '') +
+    '**Categoria:** ' + (settings.logCategoryId ? '<#' + settings.logCategoryId + '>' : 'Não criada') + '\n\n' +
+    lines.join('\n') + '\n\n' +
+    '-# A criação monta os canais privados e liga os logs automaticamente. Cartões antigos continuam com seus registros originais.',
+    [row(button('cfg:logs-create', 'Criar canais automaticamente', ButtonStyle.Success, '📁')),
+      row(button('cfg:logs', 'Ver canais configurados', ButtonStyle.Secondary, '🔎')),
+      row(button('bp:config', 'Voltar às configurações', ButtonStyle.Secondary, '↩️'))],
     true, 'purple');
 }
 function teamMenu(c) {
@@ -418,6 +445,6 @@ function warningLog(w){return v2(w.status==='revoked'?'ADVERTÊNCIA REVOGADA':'A
  w.status==='active'?[row(button(`warn:revoke:${w.id}`,'Revisar / revogar',ButtonStyle.Secondary))]:[],false,w.status==='revoked'?'slate':'red')}
 module.exports = {
   COLORS, safe, mentions, row, button, v2, msg, panel, cardText, logCard, auditLog,
-  inviteDM, dmOutcome, select, roleSelect, channelSelect, config, shiftConfig, notificationsConfig,justificationRolesConfig,
+  inviteDM, dmOutcome, select, roleSelect, channelSelect, config, shiftConfig, logsConfig, mandatoryConfig, notificationsConfig,justificationRolesConfig,
   teamMenu, candidateView, stat,modeConfig,presenceConfig,justificationPanel,justificationConfig,justificationReview,justificationDecisionLog,justificationDM,warningDM,warningLog,pointReceipt,receiptPhotoEmbed,receiptActions
 };
