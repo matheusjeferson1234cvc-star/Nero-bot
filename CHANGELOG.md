@@ -1,3 +1,26 @@
+# Nero Bot V4.0 — Pacote Discloud (23/11/2026)
+
+## Horas obrigatórias (atualização de 22/11)
+- Nova opção **Configurações → ⏱️ Horas obrigatórias**.
+- A meta padrão é **2 horas** e pode ser alterada de **1 a 12 horas**; vale igualmente para manhã, tarde, noite e madrugada.
+- Cartões individuais encerram automaticamente após cumprir a meta; cartões de equipe encerram quando **todos os integrantes válidos** completarem o tempo, com verificações a cada 15 segundos.
+- Pausas e horas canceladas não entram na meta. A nova meta é salva nos novos cartões, sem editar cartões antigos.
+- O encerramento registra auditoria, atualiza os cartões, remove o cargo em serviço e envia comprovantes, quando habilitados.
+- Relatórios de presença e avaliação de horas passam a usar a meta global configurada.
+
+## Logs com emojis
+- Categoria **📁 LOG BATE-PONTO** com 8 canais identificados por emojis: 📌 gerais, 🌅 manhã, ☀️ tarde, 🌙 noite, 🌌 madrugada, ❌ cancelamentos, 📋 presença e 🛡️ auditoria.
+- Botões da aba de logs: 📁 criar canais, 🔎 ver canais e ↩️ voltar.
+- Canal e categoria existentes são reaproveitados, sem duplicações.
+
+## Discloud
+- Pacote: **Nero-Discloud-v4.0.0.zip** (gerado automaticamente em Actions).
+- Configure **Gerenciar Canais** para o bot e mantenha o banco de dados e variáveis de ambiente já existentes.
+- O bot atualiza as configurações no Discord; para publicar basta atualizar os arquivos no aplicativo já criado na Discloud.
+- Não substitua `data/database.json` nem envie `.env` público.
+
+---
+
 # Nero Bot V4 — Logs Bate-Ponto (23/11/2026)
 
 - Em **Bate-Ponto → Configurações → Logs Bate-Ponto**, a administração pode usar **Criar logs automaticamente**.
