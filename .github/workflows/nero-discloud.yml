@@ -22,7 +22,7 @@ jobs:
       - name: Verificar código do Nero
         run: |
           npm run check
-          node --test tests/core.test.js tests/attendance.test.js tests/presence-reports.test.js tests/ui.test.js tests/invite-inbox.test.js tests/web-config.test.js tests/panel-sync.test.js tests/receipt-dm.test.js tests/receipt.test.js tests/warnings.test.js tests/date-br.test.js
+          node --test tests/core.test.js tests/attendance.test.js tests/presence-reports.test.js tests/ui.test.js tests/log-setup.test.js tests/invite-inbox.test.js tests/web-config.test.js tests/panel-sync.test.js tests/receipt-dm.test.js tests/receipt.test.js tests/warnings.test.js tests/date-br.test.js
       - name: Montar ZIP da Discloud
         run: |
           zip -q -r Nero-Discloud-v3.8.0.zip index.js discloud.config package.json src assets
