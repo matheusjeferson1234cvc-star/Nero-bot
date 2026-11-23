@@ -131,7 +131,7 @@ test('auditoria de cancelamento destaca motivo, integrantes e cartão original',
 test('configuração separa turnos, equipe, auditoria e visual', () => {
   const view = ui.config(core.defaultSettings());
   const ids = view.components[0].components.flatMap(c => (c.components || []).map(x => x.customId)).filter(Boolean);
-  assert.deepEqual(ids, ['cfg:shifts','cfg:mode','cfg:rules','cfg:service','cfg:notify','cfg:audit','cfg:presence','cfg:visual']);
+  assert.deepEqual(ids, ['cfg:shifts','cfg:mode','cfg:rules','cfg:service','cfg:notify','cfg:audit','cfg:presence','cfg:logs','cfg:visual']);
   assert.equal(view.components[0].accent, ui.COLORS.purple);
 });
 
@@ -214,4 +214,14 @@ test('logs de presença têm um único canal e opção de ativar ou desativar',(
  assert.match(flattened(uiBox),/123456789012345678/);
  const ids=uiBox.components.flatMap(r=>(r.components||[]).map(c=>c.customId));
  assert.ok(ids.includes('cfg:presence-channel'));assert.ok(ids.includes('cfg:presence-toggle'));
+});
+
+test('aba Logs Bate-Ponto lista canais e cria a estrutura em um clique', () => {
+ const settings=core.defaultSettings();
+ const panel=ui.logsConfig(settings);
+ const body=flattened(panel.components[0]);
+ assert.match(body, /LOGS BATE-PONTO/);
+ assert.match(body, /Não configurado/);
+ const ids=panel.components[0].components.flatMap(r => (r.components||[]).map(c => c.customId)).filter(Boolean);
+ assert.deepEqual(ids, ['cfg:logs-create','bp:config']);
 });
