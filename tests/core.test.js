@@ -50,3 +50,35 @@ test('histórico antigo permanece acessível sem exibir saldo separado de extra'
  assert.equal(rank.extra,0);
  assert.equal(rank.total,saldo.normal);
 });
+
+test('meta única de 3 horas não fecha ponto individual antes da meta',()=>{
+ const x=g();x.settings.mandatoryMinutes=180;
+ const now=Date.parse('2026-11-23T10:00:00Z');
+ const c=core.createSoloCard(x,{shift:'manha',leaderId:'1',now});
+ assert.equal(c.requiredMinutes,180);
+ assert.equal(core.autoCloseDue(c,now+179*60000),false);
+ assert.equal(core.autoCloseDue(c,now+180*60000),true);
+ core.finish(c,c.leaderId,now+180*60000);
+ assert.equal(core.autoCloseDue(c,now+200*60000),false);
+});
+test('pausa não conta para meta obrigatória e equipe só fecha após todos completarem',()=>{
+ const x=g();x.settings.mandatoryMinutes=180;
+ const t=Date.parse('2026-11-23T10:00:00Z');
+ const c=core.createCard(x,{shift:'manha',name:'Equipe Beta',leaderId:'1',invitees:['2'],now:t});
+ core.respondInvite(c,'2',true,t+1000);core.launch(c,t+1000);
+ core.pause(c,'1',t+120*60000+1000);
+ assert.equal(core.autoCloseDue(c,t+200*60000),false);
+ core.resume(c,'1',t+200*60000+1000);
+ core.inviteJoin(x,c,'3','1',{type:'normal',originShift:'manha'},t+205*60000);
+ core.respondJoin(x,c,'3',true,t+206*60000);
+ assert.equal(core.autoCloseDue(c,t+400*60000),true);
+ // Terceiro integrante tem menos horas do que a dupla no primeiro momento da retomada.
+ assert.equal(core.autoCloseDue(c,t+350*60000),false);
+ core.finish(c,'1',t+400*60000);
+ assert.equal(c.status,'ended');
+});
+test('cartões anteriores sem meta individual mantêm o histórico',()=>{
+ const x=g(),c=core.createSoloCard(x,{shift:'noite',leaderId:'1',now:1000});
+ delete c.requiredMinutes;
+ assert.equal(core.autoCloseDue(c,9999999999),false);
+});
