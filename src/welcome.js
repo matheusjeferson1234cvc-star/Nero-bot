@@ -83,4 +83,4 @@ async function handle(i){
  }catch(e){if(i.deferred)await i.editReply('⚠️ '+e.message);else if(!i.replied)await i.reply({content:'⚠️ '+e.message,flags:MessageFlags.Ephemeral});}
  return true;
 }
-module.exports={command,install,handle,render};
+module.exports={command,install,handle,render,messagePayload,grantJoinRole};
