@@ -17,10 +17,11 @@ function normalizeWelcome(input){
   const title=item.title??(k==='join'?'👋 Bem-vindo(a)!':'👋 Até logo!');
   const color=item.color??(k==='join'?'#16a34a':'#dc2626');
   const avatar=item.avatar??true, banner=item.banner??true;
-  const gif=item.gif||null;
+  const gif=item.gif||null, roleId=k==='join'?(item.roleId||null):null;
+  if(roleId!==null&&!snowflake(roleId))throw Error('Cargo de entrada inválido');
   if(typeof title!=='string'||!title.trim()||title.length>100||typeof color!=='string'||!/^#[0-9a-f]{6}$/i.test(color)||typeof avatar!=='boolean'||typeof banner!=='boolean')throw Error('Visual de entrada e saída inválido');
   if(gif!==null){try{if(typeof gif!=='string'||gif.length>500)throw Error('url');const u=new URL(gif);if(u.protocol!=='https:'||!u.pathname.toLowerCase().endsWith('.gif')||u.username||u.password)throw Error('url');}catch{throw Error('Informe um link HTTPS direto para o GIF.');}}
-  out[k]={enabled,channelId,message:message.trim(),title:title.trim(),color,avatar,banner,gif};
+  out[k]={enabled,channelId,message:message.trim(),title:title.trim(),color,avatar,banner,gif,roleId};
  }
  return out;
 }
@@ -67,7 +68,7 @@ function normalize(input){
 function assertResources(config,roles,channels,guildId){
  const availableRoles=new Set(roles.filter(r=>r.id!==guildId&&!r.managed).map(r=>r.id));
  const availableChannels=new Set(channels.filter(c=>[0,5].includes(c.type)).map(c=>c.id));
- const roleIds=[config.serviceRoleId,...config.justifications.warningRoles,...Object.values(config.shifts).flatMap(s=>[...s.roleIds,...s.supervisorRoles])].filter(Boolean);
+ const roleIds=[config.welcome?.join?.roleId,config.serviceRoleId,...config.justifications.warningRoles,...Object.values(config.shifts).flatMap(s=>[...s.roleIds,...s.supervisorRoles])].filter(Boolean);
  const channelIds=[...Object.values(config.welcome||{}).map(x=>x.channelId),config.auditChannelId,config.presenceLogChannelId,config.justifications.reviewChannelId,config.justifications.logChannelId,config.justifications.warningChannelId,...Object.values(config.shifts).map(s=>s.logChannelId)].filter(Boolean);
  if(roleIds.some(id=>!availableRoles.has(id)))throw Error('Há um cargo inválido, gerenciado ou de outro servidor');
  if(channelIds.some(id=>!availableChannels.has(id)))throw Error('Há um canal inválido ou de outro servidor');
