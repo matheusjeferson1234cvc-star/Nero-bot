@@ -344,15 +344,18 @@ async function onButton(i){const [prefix,verb,arg]=i.customId.split(':');const g
   const j=g.justifications[arg];if(!j||j.status!=='pending')return fail(i,'Justificativa já analisada ou inexistente.');
   if(!(await isSupervisor(i,guild,j.shift)))return fail(i,'Somente responsáveis podem analisar justificativas.');
   await defer(i);
+  if(j.status!=='pending')return fail(i,'Justificativa já analisada.');
   j.status=verb==='approve'?'approved':'rejected';j.reviewerId=i.user.id;j.decidedAt=Date.now();store.save();
-  const dest=await client.users.fetch(j.userId).catch(()=>null);if(dest)await dest.send({embeds:[ui.justificationDM(j)],allowedMentions:ui.mentions}).catch(()=>{});
-  if(i.message)await i.message.edit(ui.v2('JUSTIFICATIVA ANALISADA',`**Protocolo:** ${j.id}\n**Membro:** <@${j.userId}>\n**Dias:** ${(j.dates||[j.date]).map(formatDateBR).join(', ')}\n**Situação:** ${j.status==='approved'?'Aprovada':'Recusada'}\n**Responsável:** <@${i.user.id}>`,[],false));
+  let dmSent=false,reviewUpdated=false,logSent=false;
+  const dest=await client.users.fetch(j.userId).catch(()=>null);
+  if(dest){try{await dest.send(ui.justificationDM(j,guild.name));dmSent=true;}catch(err){console.warn('Não foi possível entregar o resultado no PV:',err.message);}}
+  if(i.message){try{await i.message.edit(ui.justificationDecisionLog(j));reviewUpdated=true;}catch(err){console.warn('Não foi possível atualizar a justificativa:',err.message);}}
   const logId=s.justifications.logChannelId||s.justifications.reviewChannelId;
-  if(logId)try{const logCh=await fetchText(guild,logId,'de justificativas');await logCh.send(ui.justificationDecisionLog(j))}
-   catch(err){console.warn('Não foi possível publicar o log de justificativa:',err.message)}
+  if(logId&&(logId!==i.channelId||!reviewUpdated))try{const logCh=await fetchText(guild,logId,'de justificativas');await logCh.send(ui.justificationDecisionLog(j));logSent=true;}
+   catch(err){console.warn('Não foi possível publicar o log de justificativa:',err.message);}
   let synced=false;
   try{synced=await siteSync.pushJustification(guild.id,j)}catch(err){console.warn('Justificativa salva no bot; site será atualizado na próxima sincronização:',err.message)}
-  return present(i,ui.msg(synced?'Decisão registrada no bot e sincronizada com o site.':'Decisão salva no bot. A sincronização com o site será repetida automaticamente.'));
+  return present(i,ui.msg('✅ Decisão registrada. '+(dmSent?'Membro notificado no PV.':'Não foi possível enviar o PV.')+(!reviewUpdated&&!logSent?' Não foi possível atualizar o registro visual.':'')+(synced?' Sincronização concluída.':'')));
  }
  if(prefix==='warn'&&verb==='revoke'){
   if(!(await isAdmin(i)))return fail(i,'Somente administradores podem revogar advertências.');
@@ -544,8 +547,8 @@ async function onModal(i){const [prefix,verb,arg]=i.customId.split(':');const gu
   const j={id,userId:i.user.id,date:dates[0],startDate:day,days:count,dates,shift,reason,status:'pending',at:Date.now(),reviewerId:null,decidedAt:null};
   const channel=await fetchText(guild,s.justifications.reviewChannelId,'de análise');
   await channel.send(ui.justificationReview(j));g.justifications[id]=j;store.save();
-  await i.user.send({embeds:[ui.justificationDM(j)],allowedMentions:ui.mentions}).catch(()=>{});
-  return present(i,ui.msg(`✅ Justificativa ${id} enviada. Aguarde a avaliação.`));
+  const delivered=await i.user.send(ui.justificationDM(j,guild.name)).then(()=>true).catch(()=>false);
+  return present(i,ui.msg('✅ Justificativa '+id+' enviada. '+(delivered?'Confira o comprovante no PV.':'Não foi possível enviar o comprovante no PV.')+' Aguarde a avaliação.'));
  }
  if(prefix==='start'){
   const shift=verb,name=i.fields.getTextInputValue('team').trim();
