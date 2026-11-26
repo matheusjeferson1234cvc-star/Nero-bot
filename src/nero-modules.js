@@ -2,11 +2,10 @@
 const D=require('discord.js'),{randomUUID}=require('node:crypto'),store=require('./store'),attendance=require('./attendance');
 const P=D.PermissionFlagsBits,B=D.ButtonStyle,E=D.MessageFlags.Ephemeral;
 const names={meeting:'REUNIÕES',support:'ATENDIMENTO',course:'NERO ACADEMY'};
-const namesCmd={meeting:'painelreuniao',support:'painelatendimento',course:'painelcurso'};
+const namesCmd={support:'painelatendimento'};
 const commands=Object.entries(namesCmd).map(([k,n])=>{
  const c=new D.SlashCommandBuilder().setName(n).setDescription('Publicar painel de '+names[k].toLowerCase()).setDefaultMemberPermissions(P.ManageGuild);
  if(k==='support')c.addRoleOption(o=>o.setName('atendentes').setDescription('Cargo de atendimento').setRequired(true)).addChannelOption(o=>o.setName('categoria').setDescription('Categoria dos tickets').addChannelTypes(D.ChannelType.GuildCategory));
- if(k==='course')c.addChannelOption(o=>o.setName('logs').setDescription('Canal privado para logs de cursos').addChannelTypes(D.ChannelType.GuildText));
  return c.addChannelOption(o=>o.setName('canal').setDescription('Canal de publicação').addChannelTypes(D.ChannelType.GuildText));
 });
 const id=()=>randomUUID().replaceAll('-','').slice(0,16),locks=new Set(),mentions={parse:[]};
