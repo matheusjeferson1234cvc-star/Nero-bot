@@ -1,7 +1,7 @@
 {
   "name": "central-de-ponto-equipes-rp",
-  "version": "4.5.3",
-  "description": "Nero Bot V4.5.3 — correção dos cartões de entrada e saída",
+  "version": "4.5.4",
+  "description": "Nero Bot V4.5.4 — relatórios de atendimento e boas-vindas V2",
   "private": true,
   "main": "index.js",
   "type": "commonjs",
