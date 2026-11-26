@@ -17,6 +17,7 @@ const presenceReports=require('./presence-reports');
 const panelSync=require('./panel-sync');
 const logSetup=require('./log-setup');
 const neroModules=require('./nero-modules');
+const meetingV2=require('./meeting-v2');
 const welcome=require('./welcome');
 const inbox=require('./invite-inbox');
 const token=process.env.DISCORD_TOKEN;
@@ -38,7 +39,7 @@ const monitorCommand=new SlashCommandBuilder().setName('fiscalizarponto')
 const testImageCommand=new SlashCommandBuilder().setName('testarcomprovante')
  .setDescription('Enviar mensagem de comprovante de TESTE no privado (não registra horas)')
  .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild);
-const commands=[command,justCommand,testCommand,monitorCommand,testImageCommand,...neroModules.commands,welcome.command];
+const commands=[command,justCommand,testCommand,monitorCommand,testImageCommand,...neroModules.commands.filter(c=>c.name!=='painelreuniao'),meetingV2.command,welcome.command];
 const db=guild=>store.get(guild.id);
 const sid=i=>`${i.guildId}:${i.user.id}`;
 const setting=guild=>db(guild).settings;
@@ -667,6 +668,7 @@ client.on(Events.InteractionCreate,async i=>{
   if(i.isButton()&&/^(dm|dj):/.test(i.customId))return handleDM(i);
   if(!i.inGuild())return;
   if(await welcome.handle(i))return;
+  if(await meetingV2.handle(i))return;
   if(await neroModules.handle(i))return;
   if(i.isChatInputCommand()){
    if(i.commandName==='fiscalizarponto')return showMonitor(i);
