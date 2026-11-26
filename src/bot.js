@@ -23,7 +23,7 @@ const inbox=require('./invite-inbox');
 const token=process.env.DISCORD_TOKEN;
 if(!token){console.error('❌ Defina DISCORD_TOKEN nas variáveis privadas ou no arquivo .env.');process.exit(1);}
 // Para listas de membros realmente filtradas, habilite SERVER MEMBERS INTENT no Developer Portal.
-const client=new Client({intents:[GatewayIntentBits.Guilds,GatewayIntentBits.GuildMembers]});
+const client=new Client({intents:[GatewayIntentBits.Guilds,GatewayIntentBits.GuildMembers,GatewayIntentBits.GuildMessages]});
 const sessions=new Map(),cancellations=new Map(),locks=new Set();
 const eph=MessageFlags.Ephemeral;
 const {commands}=require('./commands');
@@ -654,6 +654,7 @@ client.on(Events.GuildCreate,async guild=>{await syncGuild(guild);await refreshA
 client.on(Events.InteractionCreate,async i=>{
  try{
   if(i.isButton()&&/^(dm|dj):/.test(i.customId))return handleDM(i);
+  if(i.isButton()&&i.customId.startsWith('nrate:')&&!i.inGuild())return neroModules.handleRating(i);
   if(!i.inGuild())return;
   if(i.isChatInputCommand()&&(!commands.some(c=>c.name===i.commandName)||!i.memberPermissions?.has(PermissionFlagsBits.Administrator)))return i.reply({content:'Comando indisponível ou restrito a administradores.',flags:eph});
   if(await welcome.handle(i))return;
@@ -691,6 +692,7 @@ client.on(Events.Error,e=>console.error('Erro do Discord:',e));
 process.on('unhandledRejection',e=>console.error('Rejeição inesperada:',e));
 process.on('uncaughtException',e=>console.error('Erro crítico:',e));
 welcome.install(client);
+neroModules.install(client);
 siteSync.install(client);
 attendRuntime.install(client);
 presenceReports.install(client);
