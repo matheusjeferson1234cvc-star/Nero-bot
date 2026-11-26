@@ -12,7 +12,7 @@ const row=(...x)=>new D.ActionRowBuilder().addComponents(...x);
 const text=(s)=>new D.TextDisplayBuilder().setContent(s);
 const reply=(i,content)=>i.deferred?i.editReply({content,allowedMentions:{parse:[]}}):i.reply({content,flags:E,allowedMentions:{parse:[]}});
 const defer=i=>i.deferReply({flags:E});
-function state(guild){const g=store.get(guild.id);g.meetingsV2??={items:{},logs:{},panel:null};return g.meetingsV2;}
+function state(guild){const g=store.get(guild.id);g.meetingsV2??={items:{},logs:{},panel:null};const s=g.meetingsV2;let changed=false;for(const old of Object.values(g.neroModules?.meetings||{})){if(old.closed||s.items[old.id])continue;s.items[old.id]={id:old.id,title:old.title,description:old.description,when:old.when,roleId:null,status:'scheduled',rsvp:{...old.responses},present:{},justifications:{},roster:null,audit:[{action:'migrated_v1',at:Date.now()}],createdBy:old.createdBy,channelId:old.channelId,messageId:old.messageId};changed=true;}if(changed)store.save();return s;}
 function card(title,body,rows=[],banner=false){
  const c=new D.ContainerBuilder().setAccentColor(0xdc2626),files=[];
  if(banner){const name='nero-meeting.gif';c.addMediaGalleryComponents(new D.MediaGalleryBuilder().addItems(new D.MediaGalleryItemBuilder().setURL('attachment://'+name)));files.push(new D.AttachmentBuilder(path.join(__dirname,'..','assets',name),{name}));}
@@ -60,9 +60,10 @@ async function showJustify(i,s,x){
 }
 async function handle(i){
  const custom=i.customId||'',slash=i.isChatInputCommand()&&i.commandName==='painelreuniao';
- const old=custom==='n41:new:meeting'||custom==='n41:list:meeting';
- if(!slash&&!old&&custom!=='just:open'&&!custom.startsWith('m42:'))return false;
+ const old=custom==='n41:new:meeting'||custom==='n41:list:meeting';const legacy=custom.startsWith('n41:rsvp:')||custom.startsWith('n41:finish:meeting:');
+ if(!slash&&!old&&!legacy&&custom!=='just:open'&&!custom.startsWith('m42:'))return false;
  try{const s=state(i.guild);
+ if(legacy){const pieces=custom.split(':');const x=s.items[pieces[2]==='meeting'?pieces[3]:pieces[2]];if(!x)throw Error('Reunião antiga encerrada; histórico preservado.');await defer(i);await refresh(i.guild,x);await reply(i,'Painel atualizado para V2. Use os novos botões de presença ou confirmação.');return true;}
  if(slash){requireAdmin(i);await defer(i);const ch=i.options.getChannel('canal')||i.channel;if(!ch?.send||ch.guildId!==i.guildId)throw Error('Canal inválido.');let msg=null;if(s.panel?.channelId===ch.id)msg=await ch.messages.fetch(s.panel.messageId).catch(()=>null);if(msg&&msg.author.id===i.client.user.id)await msg.edit({...main(),attachments:[]});else msg=await ch.send(main());s.panel={channelId:ch.id,messageId:msg.id};store.save();await reply(i,'Central V2 publicada em <#'+ch.id+'>.');return true;}
  const [action,k,a]=old?[custom.includes(':new:')?'new':'mine']:custom==='just:open'?['chooseType']:custom.slice(4).split(':');const x=s.items[k];
  if(action==='chooseType'){await i.reply({content:'Qual tipo de ausência deseja justificar?',components:[row(b('shift','Falta no turno',B.Primary),b('chooseMeeting','Falta em reunião',B.Primary))],flags:E});}
