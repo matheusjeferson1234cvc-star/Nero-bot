@@ -1,7 +1,7 @@
 {
   "name": "central-de-ponto-equipes-rp",
-  "version": "4.5.4",
-  "description": "Nero Bot V4.5.4 — relatórios de atendimento e boas-vindas V2",
+  "version": "4.5.5",
+  "description": "Nero Bot V4.5.5 — central de justificativas V2",
   "private": true,
   "main": "index.js",
   "type": "commonjs",

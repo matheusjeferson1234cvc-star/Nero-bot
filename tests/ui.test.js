@@ -28,6 +28,9 @@ class Fake {
   addActionRowComponents(...items) { return this.addComponents(...items); }
   addTextDisplayComponents(...items) { return this.addComponents(...items); }
   addMediaGalleryComponents(...items) { return this.addComponents(...items); }
+  addSeparatorComponents(...items) { return this.addComponents(...items); }
+  setDivider(v) { this.divider=v; return this; }
+  setSpacing(v) { this.spacing=v; return this; }
   addItems(...items) { this.items.push(...items); return this; }
   addOptions(...items) { this.items.push(...items); return this; }
   addFields(...items) { this.fields.push(...items); return this; }
@@ -38,7 +41,7 @@ const mock = {
   AttachmentBuilder, ContainerBuilder: Fake, TextDisplayBuilder: Fake, MediaGalleryBuilder: Fake,
   MediaGalleryItemBuilder: Fake, EmbedBuilder: Fake, ActionRowBuilder: Fake,
   ButtonBuilder: Fake, StringSelectMenuBuilder: Fake, RoleSelectMenuBuilder: Fake,
-  ChannelSelectMenuBuilder: Fake, ChannelType: {GuildText: 0},
+  ChannelSelectMenuBuilder: Fake, ChannelType: {GuildText: 0}, SeparatorBuilder: Fake, SeparatorSpacingSize: {Small:1},
   ButtonStyle: {Success: 3, Secondary: 2, Primary: 1, Danger: 4},
   MessageFlags: {IsComponentsV2: 32768, Ephemeral: 64}
 };
@@ -234,4 +237,17 @@ test('configuração de horas obrigatórias mostra a mesma meta para os quatro t
  assert.match(body,/3 hora/);
  const ids=panel.components[0].components.flatMap(r=>(r.components||[]).map(c=>c.customId)).filter(Boolean);
  assert.deepEqual(ids,['cfg:mandatory-edit','bp:config']);
+});
+
+test('justificativas mostram início e fim reais sem listar todos os dias; PV usa V2',()=>{
+ const j={id:'JST-000002',userId:'111111111111111111',shift:'noite',date:'2026-11-26',dates:['2026-11-30','2026-11-26','2026-11-27','2026-11-27'],reason:'Motivo privado',status:'pending',at:1795690000000};
+ assert.deepEqual(ui.justificationPeriod(j),{start:'26/11/2026',end:'30/11/2026',count:3});
+ const pending=ui.justificationReview(j),dm=ui.justificationDM(j,'Nero'),log=ui.justificationDecisionLog({...j,status:'approved',reviewerId:'222222222222222222',decidedAt:1795690010000});
+ const p=flattened(pending.components[0]),d=flattened(dm.components[0]),l=flattened(log.components[0]);
+ assert.match(p,/Dias de serviço:\*\* 3/);assert.ok(!p.includes('27/11/2026'));assert.match(p,/Motivo privado/);
+ assert.equal(dm.flags,32768);assert.equal(dm.embeds,undefined);assert.match(d,/Servidor:\*\* Nero/);
+ assert.ok(!l.includes('Motivo privado'));assert.match(l,/Falta abonada/);
+ assert.ok(!log.components[0].components.some(c=>c.components.some(b=>b.customId)));
+ const meeting=ui.justificationCard({...j,status:'rejected'},{meeting:{title:'Reunião geral',when:1795690010000}});
+ assert.match(flattened(meeting.components[0]),/Não altera faltas nem advertências do turno/);
 });
