@@ -26,15 +26,8 @@ if(!token){console.error('❌ Defina DISCORD_TOKEN nas variáveis privadas ou no
 const client=new Client({intents:[GatewayIntentBits.Guilds,GatewayIntentBits.GuildMembers]});
 const sessions=new Map(),cancellations=new Map(),locks=new Set();
 const eph=MessageFlags.Ephemeral;
-const command=new SlashCommandBuilder().setName('painelbateponto').setDescription('Publicar a Central de Ponto por equipes e turnos')
- .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
- .addChannelOption(o=>o.setName('canal').setDescription('Canal para publicar a Central de Ponto').addChannelTypes(ChannelType.GuildText).setRequired(false));
-const justCommand=new SlashCommandBuilder().setName('paineljustificativas').setDescription('Publicar painel de justificativas no servidor')
- .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
- .addChannelOption(o=>o.setName('canal').setDescription('Canal de publicação').addChannelTypes(ChannelType.GuildText).setRequired(false));
-const monitorCommand=new SlashCommandBuilder().setName('fiscalizarponto')
- .setDescription('Consultar e fiscalizar cartões de ponto (somente responsáveis)');
-const commands=[command,justCommand,monitorCommand,...neroModules.commands.filter(c=>!['painelreuniao','painelcurso'].includes(c.name)),meetingV2.command,meetingV2.presenceCommand,welcome.command].map(c=>c.setDefaultMemberPermissions(PermissionFlagsBits.Administrator));
+const {commands}=require('./commands');
+const {syncGuildCommands,clearLegacyGlobalCommands}=require('./sync-commands');
 const db=guild=>store.get(guild.id);
 const sid=i=>`${i.guildId}:${i.user.id}`;
 const setting=guild=>db(guild).settings;
@@ -655,8 +648,8 @@ async function handleDM(i){
   return respond(action==='yes'?`✅ Você entrou na equipe ${ui.safe(c.name)} como integrante do turno. Contagem iniciada agora.`:'❌ Convite recusado.');
  }finally{locks.delete(c.id);}
 }
-async function syncGuild(guild){try{await guild.commands.set(commands.map(c=>c.toJSON()));console.log(`✅ /painelbateponto em ${guild.name}`);}catch(e){console.error(`Falha sincronização ${guild.id}:`,e.message);}}
-client.once(Events.ClientReady,async()=>{console.log(`✅ Central de Ponto conectada como ${client.user.tag}`);for(const guild of client.guilds.cache.values()){await syncGuild(guild);await refreshAllPanels(guild);}await autoCloseAll();});
+async function syncGuild(guild){return syncGuildCommands(guild);}
+client.once(Events.ClientReady,async()=>{console.log(`✅ Central de Ponto conectada como ${client.user.tag}`);let registered=true;for(const guild of client.guilds.cache.values()){if(!await syncGuild(guild))registered=false;await refreshAllPanels(guild);}if(registered&&client.guilds.cache.size)await clearLegacyGlobalCommands(client);await autoCloseAll();});
 client.on(Events.GuildCreate,async guild=>{await syncGuild(guild);await refreshAllPanels(guild);});
 client.on(Events.InteractionCreate,async i=>{
  try{
