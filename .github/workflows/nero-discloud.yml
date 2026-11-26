@@ -3,6 +3,10 @@ on:
   push:
     branches:
       - main
+      - feature/nero-v41-modulos
+      - feature/nero-v42-boasvindas
+      - feature/nero-v43-reunioes
+      - feature/nero-v451-formularios
       - feat/presenca-sem-hora-extra-20261122
       - feat/v4-logs-bate-ponto-automativo
   workflow_dispatch:
@@ -23,14 +27,22 @@ jobs:
       - name: Verificar código do Nero
         run: |
           npm run check
+          node --check src/nero-modules.js
+          node --check src/meeting-v2.js
+          node --check src/meeting-form.js
+          node --check src/welcome-card.js
+          node --test test/meeting-form.test.js
+          node --test test/nero-modules.test.js test/welcome.test.js test/meeting-v2.test.js
+          python3 -m pip install pillow
+          python3 scripts/make-nero-v43-banners.py
           node --test tests/core.test.js tests/attendance.test.js tests/presence-reports.test.js tests/ui.test.js tests/log-setup.test.js tests/invite-inbox.test.js tests/web-config.test.js tests/panel-sync.test.js tests/receipt-dm.test.js tests/receipt.test.js tests/warnings.test.js tests/date-br.test.js
       - name: Montar ZIP da Discloud
         run: |
-          zip -q -r Nero-Discloud-v4.0.0.zip index.js discloud.config package.json src assets
-          unzip -l Nero-Discloud-v4.0.0.zip | head -25
+          zip -q -r Nero-Discloud-v4.5.1.zip index.js discloud.config package.json src assets NERO-V41-MODULOS.md
+          unzip -l Nero-Discloud-v4.5.1.zip | head -25
       - name: Publicar pacote
         uses: actions/upload-artifact@v4
         with:
-          name: Nero-Discloud-v4.0.0
-          path: Nero-Discloud-v4.0.0.zip
+          name: Nero-Discloud-v4.5.1
+          path: Nero-Discloud-v4.5.1.zip
           retention-days: 30

@@ -16,6 +16,9 @@ const attendRuntime=require('./attendance-runtime');
 const presenceReports=require('./presence-reports');
 const panelSync=require('./panel-sync');
 const logSetup=require('./log-setup');
+const neroModules=require('./nero-modules');
+const meetingV2=require('./meeting-v2');
+const welcome=require('./welcome');
 const inbox=require('./invite-inbox');
 const token=process.env.DISCORD_TOKEN;
 if(!token){console.error('❌ Defina DISCORD_TOKEN nas variáveis privadas ou no arquivo .env.');process.exit(1);}
@@ -23,20 +26,8 @@ if(!token){console.error('❌ Defina DISCORD_TOKEN nas variáveis privadas ou no
 const client=new Client({intents:[GatewayIntentBits.Guilds,GatewayIntentBits.GuildMembers]});
 const sessions=new Map(),cancellations=new Map(),locks=new Set();
 const eph=MessageFlags.Ephemeral;
-const command=new SlashCommandBuilder().setName('painelbateponto').setDescription('Publicar a Central de Ponto por equipes e turnos')
- .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
- .addChannelOption(o=>o.setName('canal').setDescription('Canal para publicar a Central de Ponto').addChannelTypes(ChannelType.GuildText).setRequired(false));
-const justCommand=new SlashCommandBuilder().setName('paineljustificativas').setDescription('Publicar painel de justificativas no servidor')
- .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
- .addChannelOption(o=>o.setName('canal').setDescription('Canal de publicação').addChannelTypes(ChannelType.GuildText).setRequired(false));
-const testCommand=new SlashCommandBuilder().setName('testepresenca').setDescription('Simular presença/advertências SEM aplicar cargos ou enviar avisos')
- .addStringOption(o=>o.setName('data').setDescription('Dia para conferir, no formato AAAA-MM-DD').setRequired(false));
-const monitorCommand=new SlashCommandBuilder().setName('fiscalizarponto')
- .setDescription('Consultar e fiscalizar cartões de ponto (somente responsáveis)');
-const testImageCommand=new SlashCommandBuilder().setName('testarcomprovante')
- .setDescription('Enviar mensagem de comprovante de TESTE no privado (não registra horas)')
- .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild);
-const commands=[command,justCommand,testCommand,monitorCommand,testImageCommand];
+const {commands}=require('./commands');
+const {syncGuildCommands,clearLegacyGlobalCommands}=require('./sync-commands');
 const db=guild=>store.get(guild.id);
 const sid=i=>`${i.guildId}:${i.user.id}`;
 const setting=guild=>db(guild).settings;
@@ -657,41 +648,19 @@ async function handleDM(i){
   return respond(action==='yes'?`✅ Você entrou na equipe ${ui.safe(c.name)} como integrante do turno. Contagem iniciada agora.`:'❌ Convite recusado.');
  }finally{locks.delete(c.id);}
 }
-async function syncGuild(guild){try{await guild.commands.set(commands.map(c=>c.toJSON()));console.log(`✅ /painelbateponto em ${guild.name}`);}catch(e){console.error(`Falha sincronização ${guild.id}:`,e.message);}}
-client.once(Events.ClientReady,async()=>{console.log(`✅ Central de Ponto conectada como ${client.user.tag}`);for(const guild of client.guilds.cache.values()){await syncGuild(guild);await refreshAllPanels(guild);}await autoCloseAll();});
+async function syncGuild(guild){return syncGuildCommands(guild);}
+client.once(Events.ClientReady,async()=>{console.log(`✅ Central de Ponto conectada como ${client.user.tag}`);let registered=true;for(const guild of client.guilds.cache.values()){if(!await syncGuild(guild))registered=false;await refreshAllPanels(guild);}if(registered&&client.guilds.cache.size)await clearLegacyGlobalCommands(client);await autoCloseAll();});
 client.on(Events.GuildCreate,async guild=>{await syncGuild(guild);await refreshAllPanels(guild);});
 client.on(Events.InteractionCreate,async i=>{
  try{
   if(i.isButton()&&/^(dm|dj):/.test(i.customId))return handleDM(i);
   if(!i.inGuild())return;
+  if(i.isChatInputCommand()&&(!commands.some(c=>c.name===i.commandName)||!i.memberPermissions?.has(PermissionFlagsBits.Administrator)))return i.reply({content:'Comando indisponível ou restrito a administradores.',flags:eph});
+  if(await welcome.handle(i))return;
+  if(await meetingV2.handle(i))return;
+  if(await neroModules.handle(i))return;
   if(i.isChatInputCommand()){
    if(i.commandName==='fiscalizarponto')return showMonitor(i);
-   if(i.commandName==='testarcomprovante'){
-    const owner=process.env.BOT_OWNER_DISCORD_ID===i.user.id;
-    if(!owner&&!(await isAdmin(i)))return fail(i,'Somente administração ou dono do bot pode testar o comprovante.');
-    await i.deferReply({flags:eph});
-    const now=Date.now(),dummy=core.defaultGuild();
-    const card=core.createSoloCard(dummy,{shift:'noite',leaderId:i.user.id,now:now-60*60000});
-    card.name='TESTE SEM REGISTRO DE HORAS';core.finish(card,i.user.id,now);
-    const user=i.user;
-    const result=await sendReceiptDM({user,card,member:card.members[0],displayName:i.member?.displayName||user.globalName||user.username,
-     username:user.username,avatarUrls:[user.displayAvatarURL({extension:'png',size:256,forceStatic:true}),user.defaultAvatarURL].filter(Boolean),
-     timezone:setting(i.guild).timezone,notifications:{pointDm:true,receiptImage:false},logger:console});
-    return i.editReply({content:result.sent?
-      'Comprovante de teste enviado como mensagem no seu PV, sem imagens ou anexos. Nenhuma hora foi registrada.':
-      'Não consegui enviar no privado. Ative as mensagens privadas do servidor e confira os logs da Discloud. Nenhuma hora foi registrada.',
-     allowedMentions:ui.mentions});
-   }
-   if(i.commandName==='testepresenca'){
-    const owner=process.env.BOT_OWNER_DISCORD_ID===i.user.id;
-    if(!owner&&!(await isAdmin(i)))return fail(i,'Somente o dono do bot ou um administrador pode testar.');
-    const g=db(i.guild),date=i.options.getString('data')||attend.plusDays(attend.localDay(Date.now(),g.settings.timezone),-1);
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return fail(i,'Data inválida: AAAA-MM-DD');
-    const off=g.siteOff?.data||{weekly:{all:[0]},dates:[]},roster=g.attendance.rosters[date];
-    if(!roster)return present(i,ui.v2('TESTE DE PRESENÇA','Não há escala registrada nesta data. Nenhum aviso foi enviado.'));
-    const lines=[];for(const [shift,users] of Object.entries(roster.shifts))for(const userId of users){const v=attend.evaluation(g,{date,shift,userId,off,tz:g.settings.timezone});lines.push(`<@${userId}> · ${core.SHIFTS[shift]} · ${v.status} · ${v.minutes||0} min`)}
-    return present(i,ui.v2('TESTE DE PRESENÇA — SEM EFEITOS',`**Data:** ${date}\n**Advertência automática:** ${g.settings.justifications.autoWarnings?'Ativada':'Desligada'}\n\n${lines.slice(0,35).join('\n')||'Sem integrantes'}\n\n-# Este teste não atribui cargo, não altera horas e não envia advertências.`));
-   }
    if(!['painelbateponto','paineljustificativas'].includes(i.commandName))return;
    if(!(await isAdmin(i)))return fail(i,'Somente administradores podem publicar o painel.');
    await i.deferReply({flags:eph});const ch=i.options.getChannel('canal')||i.channel;
@@ -721,6 +690,7 @@ client.on(Events.InteractionCreate,async i=>{
 client.on(Events.Error,e=>console.error('Erro do Discord:',e));
 process.on('unhandledRejection',e=>console.error('Rejeição inesperada:',e));
 process.on('uncaughtException',e=>console.error('Erro crítico:',e));
+welcome.install(client);
 siteSync.install(client);
 attendRuntime.install(client);
 presenceReports.install(client);

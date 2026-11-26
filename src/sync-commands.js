@@ -13,4 +13,12 @@ async function syncGuildCommands(guild, definitions = commands, logger = console
     return false;
   }
 }
-module.exports = { syncGuildCommands };
+// Nero registra comandos por servidor; elimina versões globais antigas deste aplicativo.
+async function clearLegacyGlobalCommands(client,logger=console){
+  try {
+    const existing=await client.application.commands.fetch();
+    if(existing.size){await client.application.commands.set([]);logger.log('Comandos globais antigos removidos.');}
+    return true;
+  }catch(error){logger.error('Falha ao limpar comandos globais: '+error.message);return false;}
+}
+module.exports = { syncGuildCommands,clearLegacyGlobalCommands };

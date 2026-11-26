@@ -355,8 +355,8 @@ function justificationPanel(ephemeral=false,visual=null){
   c.addTextDisplayComponents(text(`## ${title}`));
   c.addTextDisplayComponents(text(description));
   c.addTextDisplayComponents(text(
-    'Informe a **data inicial**, a **quantidade de dias de serviço** e o **motivo**. A equipe responsável analisa a solicitação. '+
-    'Enquanto estiver pendente, uma eventual advertência daquele dia fica suspensa.\n\n'+
+    'Escolha **falta no turno** ou **falta em reunião**. Para o turno, informe data inicial e dias de serviço; para reunião, selecione a convocação. A equipe analisa a solicitação. '+
+    'Justificativas de reunião não alteram faltas nem advertências do turno.\n\n'+
     '-# Evite incluir dados médicos ou outras informações sensíveis.'
   ));
   c.addActionRowComponents(row(button('just:open','Justificar ausência',ButtonStyle.Primary,'📝'),button('just:config','Configurações',ButtonStyle.Secondary,'⚙️')));

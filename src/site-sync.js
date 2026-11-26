@@ -77,6 +77,17 @@ async function pullSiteSettings(guild,g){
  }
  return reply;
 }
+function modulesSnapshot(g){
+ const byRecent=(a,b)=>Number(b.createdAt||b.when||0)-Number(a.createdAt||a.when||0);
+ const meetings=Object.values(g.meetingsV2?.items||{}).sort(byRecent).slice(0,100).map(x=>{
+  const present=[],absent=[],justified=[],pending=[];
+  for(const u of x.roster||[]){if(Object.hasOwn(x.present||{},u))present.push(u);else if(x.justifications?.[u]?.status==='approved')justified.push(u);else if(x.justifications?.[u]?.status==='pending')pending.push(u);else if(x.status==='closed')absent.push(u);}
+  return {id:x.id,title:x.title,status:x.status,when:x.when,convoked:x.roster?.length??null,present,absent,justified,pending};
+ });
+ const courses=[]; // Histórico local preservado.
+ const tickets=Object.values(g.neroModules?.tickets||{}).sort(byRecent).slice(0,100).map(x=>({id:x.id,createdAt:x.createdAt,closed:x.closed,closedAt:x.closedAt||null,assigned:!!x.assignee}));
+ return {meetings,courses,tickets};
+}
 async function syncOne(guild){
  const g=store.get(guild.id),shifts=g.settings.shifts;
  const all=await guild.members.fetch();
@@ -84,6 +95,7 @@ async function syncOne(guild){
  if(attendance.rosterSnapshot(g,relevant))store.save();
  await post({type:'guild',guildId:guild.id,name:guild.name});
  await pullSiteSettings(guild,g);store.save();
+ try{await post({type:'modules-v43',guildId:guild.id,snapshot:modulesSnapshot(g)});}catch(e){console.warn('[Módulos] Sincronização:',e.message);}
  // As configurações do bot são a fonte oficial dos cargos e horários.
  await post({type:'bot-settings',guildId:guild.id,shiftRoles:Object.fromEntries(Object.entries(shifts).map(([k,v])=>[keys[k],v.roleIds])),shiftHours:Object.fromEntries(Object.entries(shifts).map(([k,v])=>[keys[k],[v.start,v.end]])),pointMode:g.settings.pointMode,fullConfig:g.settings});
  for(let i=0;i<relevant.length;i+=50){

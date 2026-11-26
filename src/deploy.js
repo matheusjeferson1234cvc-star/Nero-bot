@@ -2,7 +2,7 @@
 // Registro manual opcional. O bot já sincroniza os comandos automaticamente ao iniciar.
 require('dotenv').config();
 const { Client, GatewayIntentBits, Events } = require('discord.js');
-const { syncGuildCommands } = require('./sync-commands');
+const { syncGuildCommands,clearLegacyGlobalCommands } = require('./sync-commands');
 const token=process.env.DISCORD_TOKEN;
 if(!token || token==='COLE_SEU_TOKEN_AQUI') {
  console.error('❌ Preencha DISCORD_TOKEN no .env antes de executar.');
@@ -14,6 +14,7 @@ client.once(Events.ClientReady,async()=>{
  try {
    for(const guild of client.guilds.cache.values())if(!(await syncGuildCommands(guild)))errors++;
    console.log(`Registro concluído: ${client.guilds.cache.size-errors}/${client.guilds.cache.size} servidor(es).`);
+   if(!errors&&client.guilds.cache.size&&!(await clearLegacyGlobalCommands(client)))errors++;
  } finally {
    client.destroy();
    if(errors) process.exitCode=1;
