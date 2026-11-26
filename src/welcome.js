@@ -5,17 +5,22 @@ const D=require('discord.js');
 const command=new SlashCommandBuilder().setName('boasvindas').setDescription('Abrir configuração de entrada e saída V2').setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 function render(template,member,kind){
  const clean=x=>String(x??'').replaceAll('@','@\u200b');
- const values={membro:kind==='join'?'<@'+member.id+'>':clean(member.user.username),nome:clean(member.user.username),servidor:clean(member.guild.name),total:String(member.guild.memberCount)};
+ const values={membro:'<@'+member.id+'>',nome:clean(member.user.username),servidor:clean(member.guild.name),total:String(member.guild.memberCount)};
  return template.replace(/\{(membro|nome|servidor|total)\}/g,(_,k)=>values[k]);
 }
 async function messagePayload(member,kind,cfg,test=false){
- const embed=new EmbedBuilder().setDescription(((test?'**PRÉVIA • TESTE**\n':'')+render(cfg.message,member,kind)).slice(0,4096)).setColor(cfg.color);
+ const mention='<@'+member.id+'>';
+ const message=render(cfg.message,member,kind);
+ const content=((test?'**PRÉVIA • TESTE**\n':'')+(message.includes(mention)?message:mention+' • '+message)).slice(0,2000);
+ const name=D.escapeMarkdown(String(member.user.globalName||member.user.username)).replaceAll('@','@\u200b');
+ const total=Number.isSafeInteger(member.guild.memberCount)?String(member.guild.memberCount):'Indisponível';
+ const embed=new EmbedBuilder().setDescription('**Membro:** '+name+'\n**Total de membros:** '+total).setColor(cfg.color);
  const files=[];const embeds=[embed];
  if(!cfg.banner)embed.setTitle(cfg.title);
  if(cfg.banner){try{const card=await require('./welcome-card').welcomeCard(member,kind,cfg);files.push(new AttachmentBuilder(card,{name:'nero-member.png'}));embed.setImage('attachment://nero-member.png');}catch(e){console.warn('[Nero cartão]',e.message);embed.setTitle(cfg.title);if(cfg.avatar)embed.setThumbnail(member.user.displayAvatarURL());}}
  else if(cfg.avatar)embed.setThumbnail(member.user.displayAvatarURL());
  if(cfg.gif&&cfg.banner)embeds.push(new EmbedBuilder().setColor(cfg.color).setImage(cfg.gif));
- return {embeds,files,allowedMentions:{parse:[],users:kind==='join'&&!test?[member.id]:[]}};
+ return {content,embeds,files,allowedMentions:{parse:[],users:!test?[member.id]:[]}};
 }
 async function send(member,kind,test=false){
  const cfg=normalizeWelcome(store.get(member.guild.id).settings.welcome)[kind];
