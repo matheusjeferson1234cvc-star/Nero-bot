@@ -1,0 +1,88 @@
+'use strict';
+const D=require('discord.js'),store=require('./store'),{randomUUID}=require('node:crypto'),path=require('node:path');
+const P=D.PermissionFlagsBits,B=D.ButtonStyle,E=D.MessageFlags.Ephemeral;
+const command=new D.SlashCommandBuilder().setName('painelreuniao').setDescription('Publicar a Central de Reuniões V2').setDefaultMemberPermissions(P.Administrator).addChannelOption(o=>o.setName('canal').setDescription('Canal do painel').addChannelTypes(D.ChannelType.GuildText));
+const locks=new Set(),logNames={created:'reunioes-criadas',present:'presencas-reuniao',absent:'faltas-reuniao',justified:'faltas-justificadas',report:'relatorios-reuniao',review:'analise-justificativas-reuniao'};
+const safe=v=>String(v??'').replaceAll('@','@\u200b').slice(0,500);
+const id=()=>randomUUID().replaceAll('-','').slice(0,16);
+const admin=i=>Boolean(i.memberPermissions?.has(P.Administrator));
+const requireAdmin=i=>{if(!admin(i))throw Error('Apenas administradores do servidor.');};
+const b=(k,label,style=B.Secondary)=>new D.ButtonBuilder().setCustomId('m42:'+k).setLabel(label).setStyle(style);
+const row=(...x)=>new D.ActionRowBuilder().addComponents(...x);
+const text=(s)=>new D.TextDisplayBuilder().setContent(s);
+const reply=(i,content)=>i.deferred?i.editReply({content,allowedMentions:{parse:[]}}):i.reply({content,flags:E,allowedMentions:{parse:[]}});
+const defer=i=>i.deferReply({flags:E});
+function state(guild){const g=store.get(guild.id);g.meetingsV2??={items:{},logs:{},panel:null};return g.meetingsV2;}
+function card(title,body,rows=[],banner=false){
+ const c=new D.ContainerBuilder().setAccentColor(0xdc2626),files=[];
+ if(banner){const name='nero-meeting.gif';c.addMediaGalleryComponents(new D.MediaGalleryBuilder().addItems(new D.MediaGalleryItemBuilder().setURL('attachment://'+name)));files.push(new D.AttachmentBuilder(path.join(__dirname,'..','assets',name),{name}));}
+ c.addTextDisplayComponents(text('## NERO | '+title)).addTextDisplayComponents(text(body));for(const r of rows)c.addActionRowComponents(r);
+ return {components:[c],files,flags:D.MessageFlags.IsComponentsV2,allowedMentions:{parse:[]}};
+}
+function main(){return card('CENTRAL DE REUNIÕES V2','Confirmação de participação e registro de presença são independentes.',[row(b('new','Criar reunião',B.Primary),b('mine','Minhas reuniões'),b('logs','Criar logs',B.Secondary))],true);}
+function record(x){
+ const label={scheduled:'Agendada',started:'Em andamento',closed:'Encerrada'}[x.status];
+ const body=safe(x.description)+'\n📅 <t:'+Math.floor(x.when/1000)+':F>\n**Público:** '+(x.roleId?'<@&'+x.roleId+'>':'Todos os membros')+'\n**Status:** '+label+'\nConfirmações: '+Object.values(x.rsvp).filter(v=>v==='yes').length+' • Não poderão ir: '+Object.values(x.rsvp).filter(v=>v==='no').length+(x.roster?'\nPresenças registradas: '+Object.keys(x.present).length+'/'+x.roster.length:'');
+ let rows=x.status==='scheduled'?[row(b('yes:'+x.id,'Vou participar',B.Success),b('no:'+x.id,'Não poderei ir'),b('start:'+x.id,'Iniciar',B.Primary))]:x.status==='started'?[row(b('mark:'+x.id,'Registrar presença',B.Success),b('unmark:'+x.id,'Corrigir presença'),b('finish:'+x.id,'Encerrar',B.Danger))]:[row(b('report:'+x.id,'Relatório atualizado'))];
+ rows.push(row(b('justify:'+x.id,'Justificar ausência')));
+ return card(safe(x.title),body,rows,true);
+}
+function modal(key,title,fields){const m=new D.ModalBuilder().setCustomId('m42:'+key).setTitle(title);for(const [n,l,max] of fields)m.addComponents(row(new D.TextInputBuilder().setCustomId(n).setLabel(l).setRequired(true).setMaxLength(max).setStyle(max>100?D.TextInputStyle.Paragraph:D.TextInputStyle.Short)));return m;}
+const field=(i,k)=>i.fields.getTextInputValue(k).trim();
+function date(v){if(!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(v))throw Error('Use AAAA-MM-DD HH:MM (Brasília).');const t=Date.parse(v.replace(' ','T')+':00-03:00');if(!Number.isFinite(t)||new Date(t-10800000).toISOString().slice(0,16).replace('T',' ')!==v||t<=Date.now())throw Error('Data futura inválida.');return t;}
+function audit(x,action,actor,extra={}){x.audit.push({action,actor,at:Date.now(),...extra});store.save();}
+function classify(x){const result={present:[],absent:[],justified:[],pending:[]};for(const u of x.roster||[]){if(Object.hasOwn(x.present,u))result.present.push(u);else if(x.justifications[u]?.status==='approved')result.justified.push(u);else if(x.justifications[u]?.status==='pending')result.pending.push(u);else result.absent.push(u);}return result;}
+async function eligible(guild,x,user){if(x.roster)return x.roster.includes(user);const m=await guild.members.fetch(user).catch(()=>null);return !!m&&!m.user.bot&&(!x.roleId||m.roles.cache.has(x.roleId));}
+async function refresh(guild,x){try{const c=await guild.channels.fetch(x.channelId),m=await c.messages.fetch(x.messageId);await m.edit({...record(x),attachments:[]});}catch(e){console.warn('[Reuniões] atualizar painel:',e.message);}}
+async function getLog(guild,s,k){const c=await guild.channels.fetch(s.logs[k]||'').catch(()=>null);if(!c||c.guildId!==guild.id||c.type!==D.ChannelType.GuildText||!c.send)throw Error('Log não configurado: '+logNames[k]);return c;}
+async function writeLog(guild,s,k,content){try{await (await getLog(guild,s,k)).send({content,allowedMentions:{parse:[]}});return true;}catch(e){console.warn('[Reuniões]',e.message);return false;}}
+async function setupLogs(i,s){
+ requireAdmin(i);await defer(i);const key=i.guildId+':setup';if(locks.has(key))throw Error('Configuração em andamento.');locks.add(key);
+ try{let cat=s.categoryId?await i.guild.channels.fetch(s.categoryId).catch(()=>null):null;
+ if(!cat||cat.type!==D.ChannelType.GuildCategory){cat=await i.guild.channels.create({name:'📁 LOGS — REUNIÕES',type:D.ChannelType.GuildCategory,permissionOverwrites:[{id:i.guild.id,deny:[P.ViewChannel]},{id:i.client.user.id,allow:[P.ViewChannel,P.SendMessages,P.ReadMessageHistory,P.ManageChannels]}]});s.categoryId=cat.id;store.save();}
+ for(const [k,name] of Object.entries(logNames)){let c=s.logs[k]?await i.guild.channels.fetch(s.logs[k]).catch(()=>null):null;if(!c||c.type!==D.ChannelType.GuildText){c=await i.guild.channels.create({name,type:D.ChannelType.GuildText,parent:cat.id,permissionOverwrites:[{id:i.guild.id,deny:[P.ViewChannel]},{id:i.client.user.id,allow:[P.ViewChannel,P.SendMessages,P.ReadMessageHistory]}]});s.logs[k]=c.id;store.save();}}
+ return reply(i,'Logs configurados:\n'+Object.values(s.logs).map(v=>'<#'+v+'>').join('\n'));
+ }finally{locks.delete(key);}
+}
+async function report(guild,s,x){
+ const c=classify(x),header='**'+safe(x.title)+'** • ID '+x.id+'\n';let ok=true;
+ for(const k of ['present','absent','justified']){const list=c[k];const label={present:'Presentes',absent:'Faltas sem justificativa aprovada',justified:'Faltas justificadas'}[k];for(let n=0;n<Math.max(1,list.length);n+=45){const chunk=list.slice(n,n+45);if(!await writeLog(guild,s,k,header+label+' ('+list.length+')\n'+(chunk.map(u=>'<@'+u+'>').join('\n')||'Nenhum')))ok=false;}}
+ if(!await writeLog(guild,s,'report',header+'Convocados: '+x.roster.length+'\nPresentes: '+c.present.length+'\nFaltas: '+c.absent.length+'\nJustificadas: '+c.justified.length+'\nEm análise: '+c.pending.length))ok=false;
+ return {c,ok};
+}
+async function showJustify(i,s,x){
+ if(!x||!await eligible(i.guild,x,i.user.id))throw Error('Reunião indisponível para você.');
+ if(x.closedAt&&Date.now()-x.closedAt>45*86400000)throw Error('Prazo de justificativa encerrado.');
+ if(Object.hasOwn(x.present,i.user.id))throw Error('Sua presença já está registrada.');
+ if(['pending','approved'].includes(x.justifications[i.user.id]?.status))throw Error('Já existe uma justificativa para esta reunião.');
+ return i.showModal(modal('reason:'+x.id,'Justificar falta à reunião',[['reason','Motivo (não inclua dados sensíveis)',500]]));
+}
+async function handle(i){
+ const custom=i.customId||'',slash=i.isChatInputCommand()&&i.commandName==='painelreuniao';
+ const old=custom==='n41:new:meeting'||custom==='n41:list:meeting';
+ if(!slash&&!old&&custom!=='just:open'&&!custom.startsWith('m42:'))return false;
+ try{const s=state(i.guild);
+ if(slash){requireAdmin(i);await defer(i);const ch=i.options.getChannel('canal')||i.channel;if(!ch?.send||ch.guildId!==i.guildId)throw Error('Canal inválido.');let msg=null;if(s.panel?.channelId===ch.id)msg=await ch.messages.fetch(s.panel.messageId).catch(()=>null);if(msg&&msg.author.id===i.client.user.id)await msg.edit({...main(),attachments:[]});else msg=await ch.send(main());s.panel={channelId:ch.id,messageId:msg.id};store.save();await reply(i,'Central V2 publicada em <#'+ch.id+'>.');return true;}
+ const [action,k,a]=old?[custom.includes(':new:')?'new':'mine']:custom==='just:open'?['chooseType']:custom.slice(4).split(':');const x=s.items[k];
+ if(action==='chooseType'){await i.reply({content:'Qual tipo de ausência deseja justificar?',components:[row(b('shift','Falta no turno',B.Primary),b('chooseMeeting','Falta em reunião',B.Primary))],flags:E});}
+ else if(action==='shift'){const m=new D.ModalBuilder().setCustomId('just:submit').setTitle('Justificar ausência no turno');for(const [key,label,max,para] of [['day','Início (DD/MM/AAAA)',10,false],['days','Dias de serviço (1 a 60)',2,false],['reason','Motivo (não inclua dados sensíveis)',500,true]])m.addComponents(row(new D.TextInputBuilder().setCustomId(key).setLabel(label).setMaxLength(max).setRequired(true).setStyle(para?D.TextInputStyle.Paragraph:D.TextInputStyle.Short)));await i.showModal(m);}
+ else if(action==='logs')await setupLogs(i,s);
+ else if(action==='new'){requireAdmin(i);await i.showModal(modal('create','Criar reunião',[['title','Título',80],['description','Descrição',500],['date','AAAA-MM-DD HH:MM (Brasília)',16],['role','ID do cargo convocado ou TODOS',25]]));}
+ else if(action==='create'&&i.isModalSubmit()){requireAdmin(i);await defer(i);if(!s.panel)throw Error('Publique a central V2 primeiro.');const ch=await i.guild.channels.fetch(s.panel.channelId);const role=field(i,'role');let roleId=null;if(role.toLowerCase()!=='todos'){if(!/^\d{15,25}$/.test(role)||!(await i.guild.roles.fetch(role)))throw Error('Cargo inválido.');roleId=role===i.guild.id?null:role;}
+ const y={id:id(),title:field(i,'title'),description:field(i,'description'),when:date(field(i,'date')),roleId,status:'scheduled',rsvp:{},present:{},justifications:{},roster:null,audit:[],createdBy:i.user.id,channelId:ch.id};if(!y.title||!y.description)throw Error('Preencha os campos.');const msg=await ch.send(record(y));y.messageId=msg.id;s.items[y.id]=y;audit(y,'created',i.user.id);const logged=await writeLog(i.guild,s,'created','Reunião criada: '+safe(y.title)+' • '+y.id+' • <t:'+Math.floor(y.when/1000)+':F>');await reply(i,'Reunião criada.'+(logged?'':' Configure os logs no painel.'));
+ }
+ else if(action==='mine'||action==='chooseMeeting'){const candidates=Object.values(s.items).filter(y=>!y.closedAt||Date.now()-y.closedAt<=45*86400000).sort((a,b)=>b.when-a.when);const available=[];const member=await i.guild.members.fetch(i.user.id);for(const y of candidates){if(!member.user.bot&&(y.roster?y.roster.includes(i.user.id):!y.roleId||member.roles.cache.has(y.roleId)))available.push(y);if(available.length>=25)break;}
+ if(!available.length)await reply(i,'Nenhuma reunião disponível.');else if(action==='mine')await reply(i,available.map(y=>safe(y.title)+' • '+(Object.hasOwn(y.present,i.user.id)?'presente':y.justifications[i.user.id]?.status||y.status)).join('\n').slice(0,1900));else{const menu=new D.StringSelectMenuBuilder().setCustomId('m42:selectMeeting').setPlaceholder('Selecione a reunião').addOptions(available.map(y=>({label:safe(y.title).slice(0,90),value:y.id,description:new Date(y.when).toISOString().slice(0,10)})));await i.reply({content:'Escolha a reunião que deseja justificar.',components:[row(menu)],flags:E});}}
+ else if(action==='selectMeeting'&&i.isStringSelectMenu())await showJustify(i,s,s.items[i.values[0]]);
+ else if(action==='justify')await showJustify(i,s,x);
+ else if(action==='reason'&&i.isModalSubmit()){await defer(i);if(!x||!await eligible(i.guild,x,i.user.id)||x.closedAt&&Date.now()-x.closedAt>45*86400000||Object.hasOwn(x.present,i.user.id))throw Error('Reunião indisponível.');const reason=field(i,'reason');if(reason.length<10)throw Error('Informe ao menos 10 caracteres.');const key=i.guildId+':'+k+':'+i.user.id;if(locks.has(key))throw Error('Solicitação em andamento.');locks.add(key);try{if(['pending','approved'].includes(x.justifications[i.user.id]?.status))throw Error('Já existe justificativa.');const ch=await getLog(i.guild,s,'review');const j={id:id(),status:'pending',reason,at:Date.now(),userId:i.user.id};const msg=await ch.send({content:'**JUSTIFICATIVA DE REUNIÃO**\nReunião: '+safe(x.title)+'\nMembro: <@'+i.user.id+'>\nMotivo: '+safe(reason),components:[row(b('approve:'+k+':'+i.user.id+':'+j.id,'Aprovar',B.Success),b('reject:'+k+':'+i.user.id+':'+j.id,'Recusar',B.Danger))],allowedMentions:{parse:[]}});j.messageId=msg.id;x.justifications[i.user.id]=j;audit(x,'justification_submitted',i.user.id);await reply(i,'Justificativa de reunião enviada para análise. Nenhuma falta do turno foi alterada.');}finally{locks.delete(key);}}
+ else if(action==='approve'||action==='reject'){requireAdmin(i);if(!x)throw Error('Reunião inexistente.');await defer(i);const j=x.justifications[a];if(!j||j.id!==custom.split(':')[4]||j.status!=='pending'||j.messageId!==i.message?.id)throw Error('Solicitação já analisada ou inválida.');j.status=action==='approve'?'approved':'rejected';j.reviewer=i.user.id;j.decidedAt=Date.now();audit(x,'justification_'+j.status,i.user.id,{user:a});await i.message.edit({content:'Justificativa de reunião '+(j.status==='approved'?'aprovada':'recusada')+' • <@'+a+'> • '+safe(x.title),components:[],allowedMentions:{parse:[]}}).catch(()=>{});const logged=await writeLog(i.guild,s,j.status==='approved'?'justified':'absent','Decisão de justificativa • '+safe(x.title)+' • <@'+a+'> • '+j.status);await (await i.client.users.fetch(a).catch(()=>null))?.send('Sua justificativa da reunião '+safe(x.title)+' foi '+(j.status==='approved'?'aprovada.':'recusada.')).catch(()=>{});await reply(i,'Decisão registrada.'+(logged?'':' Falha ao enviar log.')+(x.status==='closed'?' Consulte ou gere o relatório atualizado.':''));}
+ else if(action==='yes'||action==='no'){if(!x||x.status!=='scheduled'||!await eligible(i.guild,x,i.user.id)||x.status!=='scheduled')throw Error('Convocação indisponível.');x.rsvp[i.user.id]=action;audit(x,'rsvp_'+action,i.user.id);await reply(i,'Resposta registrada. Isso não registra presença.');await refresh(i.guild,x);}
+ else if(action==='start'){requireAdmin(i);await defer(i);if(!x||x.status!=='scheduled')throw Error('Reunião indisponível.');const key=i.guildId+':start:'+k;if(locks.has(key))throw Error('Início em andamento.');locks.add(key);try{const members=await i.guild.members.fetch();if(x.status!=='scheduled')throw Error('Reunião já iniciada.');x.roster=[...members.values()].filter(m=>!m.user.bot&&(!x.roleId||m.roles.cache.has(x.roleId))).map(m=>m.id);if(!x.roster.length){x.roster=null;throw Error('Nenhum convocado encontrado.');}x.status='started';x.startedAt=Date.now();audit(x,'started',i.user.id);await refresh(i.guild,x);await reply(i,'Reunião iniciada. '+x.roster.length+' convocados. Use Registrar presença durante a reunião.');}finally{locks.delete(key);}}
+ else if(action==='mark'||action==='unmark'){requireAdmin(i);if(!x||x.status!=='started')throw Error('Reunião não está em andamento.');const menu=new D.UserSelectMenuBuilder().setCustomId('m42:apply:'+k+':'+action).setPlaceholder('Selecione membros convocados').setMinValues(1).setMaxValues(25);await i.reply({content:'Selecione apenas membros que você conferiu.',components:[row(menu)],flags:E});}
+ else if(action==='apply'&&i.isUserSelectMenu()){requireAdmin(i);if(!x||x.status!=='started'||!['mark','unmark'].includes(a)||i.values.some(u=>!x.roster.includes(u)))throw Error('Seleção inválida: todos devem estar convocados.');for(const u of i.values){if(a==='mark')x.present[u]={at:Date.now(),actor:i.user.id};else delete x.present[u];}audit(x,a,i.user.id,{users:i.values});await reply(i,'Presenças atualizadas: '+i.values.length);await refresh(i.guild,x);}
+ else if(action==='finish'||action==='report'){requireAdmin(i);await defer(i);if(!x||action==='finish'&&x.status!=='started'||action==='report'&&x.status!=='closed')throw Error('Reunião indisponível.');if(action==='finish'){x.status='closed';x.closedAt=Date.now();audit(x,'closed',i.user.id);await refresh(i.guild,x);}const {c,ok}=await report(i.guild,s,x);await reply(i,'Presentes: '+c.present.length+' • Faltas: '+c.absent.length+' • Justificadas: '+c.justified.length+' • Em análise: '+c.pending.length+(ok?'\nLogs enviados.':'\nAlguns logs falharam. Configure os canais e use Relatório atualizado.'));}
+ else throw Error('Ação desconhecida.');
+ }catch(e){console.warn('[Reuniões V2]',e.message);try{await reply(i,'⚠️ '+e.message);}catch{}}return true;
+}
+module.exports={command,handle,classify};
