@@ -7,8 +7,11 @@ on:
       - feature/nero-v42-boasvindas
       - feature/nero-v43-reunioes
       - feature/nero-v451-formularios
+      - feature/nero-v452-paineis
       - feat/presenca-sem-hora-extra-20261122
       - feat/v4-logs-bate-ponto-automativo
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
@@ -38,11 +41,11 @@ jobs:
           node --test tests/core.test.js tests/attendance.test.js tests/presence-reports.test.js tests/ui.test.js tests/log-setup.test.js tests/invite-inbox.test.js tests/web-config.test.js tests/panel-sync.test.js tests/receipt-dm.test.js tests/receipt.test.js tests/warnings.test.js tests/date-br.test.js
       - name: Montar ZIP da Discloud
         run: |
-          zip -q -r Nero-Discloud-v4.5.1.zip index.js discloud.config package.json src assets NERO-V41-MODULOS.md
-          unzip -l Nero-Discloud-v4.5.1.zip | head -25
+          zip -q -r Nero-Discloud-v4.5.2.zip index.js discloud.config package.json src assets NERO-V41-MODULOS.md
+          unzip -l Nero-Discloud-v4.5.2.zip | sed -n '1,25p'
       - name: Publicar pacote
         uses: actions/upload-artifact@v4
         with:
-          name: Nero-Discloud-v4.5.1
-          path: Nero-Discloud-v4.5.1.zip
+          name: Nero-Discloud-v4.5.2
+          path: Nero-Discloud-v4.5.2.zip
           retention-days: 30
