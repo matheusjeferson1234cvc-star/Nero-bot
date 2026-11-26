@@ -6,6 +6,7 @@ const ids = values => [...new Set((values||[]).filter(Boolean))];
 function defaultSettings(){
  const windows={manha:['06:00','12:00'],tarde:['12:00','18:00'],noite:['18:00','00:00'],madrugada:['00:00','06:00']};
  return {
+  welcome:{join:{enabled:false,channelId:null,message:'Bem-vindo(a), {membro}, ao {servidor}! Somos {total} membros.'},leave:{enabled:false,channelId:null,message:'{nome} saiu do {servidor}. Até logo!'}},
   notifications:{pointDm:true,receiptImage:false},
   timezone:'America/Sao_Paulo',pointMode:'team',serviceRoleId:null,auditChannelId:null,presenceLogChannelId:null,logCategoryId:null,pointEventsChannelId:null,cancelLogChannelId:null,presenceReportsEnabled:true,mandatoryMinutes:120,inviteMinutes:15,minMembers:2,maxMembers:4,
   justifications:{reviewChannelId:null,logChannelId:null,warningChannelId:null,warningRoles:[null,null,null],panel:null,autoWarnings:false,panelVisual:{title:'Justificativa de ausência',description:'Solicite a análise de uma ausência pela Central de Horas.',customGif:null}},
