@@ -8,18 +8,32 @@ function render(template,member,kind){
  const values={membro:kind==='join'?'<@'+member.id+'>':clean(member.user.username),nome:clean(member.user.username),servidor:clean(member.guild.name),total:String(member.guild.memberCount)};
  return template.replace(/\{(membro|nome|servidor|total)\}/g,(_,k)=>values[k]);
 }
+async function messagePayload(member,kind,cfg,test=false){
+ const embed=new EmbedBuilder().setDescription(((test?'**PRÉVIA • TESTE**\n':'')+render(cfg.message,member,kind)).slice(0,4096)).setColor(cfg.color);
+ const files=[];const embeds=[embed];
+ if(!cfg.banner)embed.setTitle(cfg.title);
+ if(cfg.banner){try{const card=await require('./welcome-card').welcomeCard(member,kind,cfg);files.push(new AttachmentBuilder(card,{name:'nero-member.png'}));embed.setImage('attachment://nero-member.png');}catch(e){console.warn('[Nero cartão]',e.message);embed.setTitle(cfg.title);if(cfg.avatar)embed.setThumbnail(member.user.displayAvatarURL());}}
+ else if(cfg.avatar)embed.setThumbnail(member.user.displayAvatarURL());
+ if(cfg.gif&&cfg.banner)embeds.push(new EmbedBuilder().setColor(cfg.color).setImage(cfg.gif));
+ return {embeds,files,allowedMentions:{parse:[],users:kind==='join'&&!test?[member.id]:[]}};
+}
 async function send(member,kind,test=false){
  const cfg=normalizeWelcome(store.get(member.guild.id).settings.welcome)[kind];
- if(!cfg.enabled||!cfg.channelId){if(test)throw Error('Ative e configure o canal no site.');return;}
+ if(!cfg.enabled||!cfg.channelId){if(test)throw Error('Ative e configure o canal no Discord.');return;}
  const channel=await member.guild.channels.fetch(cfg.channelId);
  if(!channel?.isTextBased()||channel.guildId!==member.guild.id||!channel.send)throw Error('Canal inválido.');
- const embed=new EmbedBuilder().setTitle(((test?'TESTE • ':'')+cfg.title).slice(0,256)).setDescription(render(cfg.message,member,kind).slice(0,4096)).setColor(cfg.color).setFooter({text:'Nero • Entrada e saída V2'}).setTimestamp();
- const files=[];if(cfg.avatar)embed.setThumbnail(member.user.displayAvatarURL());
- if(cfg.banner){if(cfg.gif)embed.setImage(cfg.gif);else{const name='nero-'+kind+'.gif';files.push(new AttachmentBuilder(require('node:path').join(__dirname,'..','assets',name),{name}));embed.setImage('attachment://'+name);}}
- await channel.send({embeds:[embed],files,allowedMentions:{parse:[]}});
+ await channel.send(await messagePayload(member,kind,cfg,test));
+}
+async function grantJoinRole(member){
+ const cfg=normalizeWelcome(store.get(member.guild.id).settings.welcome).join;
+ if(!cfg.enabled||!cfg.roleId)return;
+ const role=await member.guild.roles.fetch(cfg.roleId);
+ if(!role||role.id===member.guild.id||role.managed||!role.editable||role.permissions.has(PermissionFlagsBits.Administrator))throw Error('Cargo de entrada indisponível ou não atribuível.');
+ await member.roles.add(role,'Nero: cargo automático de entrada');
 }
 function install(client){
- for(const [event,kind] of [[Events.GuildMemberAdd,'join'],[Events.GuildMemberRemove,'leave']])client.on(event,member=>{if(member.user?.bot)return;send(member,kind).catch(e=>console.warn('[Nero entrada/saída]',e.message));});
+ client.on(Events.GuildMemberAdd,async member=>{if(member.user?.bot)return;try{await grantJoinRole(member);}catch(e){console.warn('[Nero cargo de entrada]',e.message);}try{await send(member,'join');}catch(e){console.warn('[Nero entrada]',e.message);}});
+ client.on(Events.GuildMemberRemove,member=>{if(member.user?.bot)return;send(member,'leave').catch(e=>console.warn('[Nero saída]',e.message));});
 }
 const row=(...components)=>new D.ActionRowBuilder().addComponents(...components);
 const button=(key,label,emoji,style=D.ButtonStyle.Secondary)=>new D.ButtonBuilder().setCustomId('wel:'+key).setLabel(label).setEmoji(emoji).setStyle(style);
@@ -30,6 +44,7 @@ function panel(g,kind){
  if(!kind){c.addTextDisplayComponents(text('Escolha o sistema para configurar.\n👋 Entrada: '+(cfg.join.enabled?'Ativa':'Desativada')+'\n🚪 Saída: '+(cfg.leave.enabled?'Ativa':'Desativada')));c.addActionRowComponents(row(button('open:join','Boas-vindas','👋'),button('open:leave','Saída','🚪')));}
  else{const v=cfg[kind];c.addTextDisplayComponents(text('### '+(kind==='join'?'👋 Boas-vindas':'🚪 Saída')+'\n**Status:** '+(v.enabled?'Ativo':'Desativado')+'\n**Canal:** '+(v.channelId?'<#'+v.channelId+'>':'Não configurado')+'\n**Variáveis:** {membro}, {nome}, {servidor}, {total}\n**Título:** '+v.title+'\n**Cor:** '+v.color+' • Avatar: '+(v.avatar?'Sim':'Não')+' • Banner: '+(v.banner?'Sim':'Não')));
  c.addActionRowComponents(row(new D.ChannelSelectMenuBuilder().setCustomId('wel:channel:'+kind).setPlaceholder('📢 Selecionar canal').addChannelTypes(D.ChannelType.GuildText)));
+ if(kind==='join'){c.addTextDisplayComponents(text('**Cargo automático:** '+(v.roleId?'<@&'+v.roleId+'>':'Não configurado')));c.addActionRowComponents(row(new D.RoleSelectMenuBuilder().setCustomId('wel:role:join').setPlaceholder('Selecionar cargo de entrada').setMinValues(0).setMaxValues(1)));}
  c.addActionRowComponents(row(button('toggle:'+kind,v.enabled?'Desativar':'Ativar','🔌'),button('message:'+kind,'Editar mensagem','✏️'),button('visual:'+kind,'Visual e GIF','🎨')));
  c.addActionRowComponents(row(button('avatar:'+kind,'Avatar','👤'),button('banner:'+kind,'Banner','🖼️'),button('preview:'+kind,'Prévia','👁️'),button('test:'+kind,'Enviar teste','📨')));
  c.addActionRowComponents(row(button('back','Voltar','↩️')));}
@@ -53,10 +68,11 @@ async function handle(i){
  const v=normalizeWelcome(g.settings.welcome)[kind];
  if(action==='open'){await i.update({...panel(g,kind),flags:MessageFlags.IsComponentsV2});return true;}
  if(action==='message'||action==='visual'){await i.showModal(modal(kind,action,v));return true;}
- if(action==='preview'){const m=await i.guild.members.fetch(i.user.id);const embed=new EmbedBuilder().setTitle(v.title).setDescription(render(v.message,m,kind)).setColor(v.color);const files=[];if(v.avatar)embed.setThumbnail(m.user.displayAvatarURL());if(v.banner){if(v.gif)embed.setImage(v.gif);else{const name='nero-'+kind+'.gif';files.push(new AttachmentBuilder(require('node:path').join(__dirname,'..','assets',name),{name}));embed.setImage('attachment://'+name);}}await i.reply({embeds:[embed],files,flags:MessageFlags.Ephemeral,allowedMentions:{parse:[]}});return true;}
+ if(action==='preview'){await i.deferReply({flags:MessageFlags.Ephemeral});const m=await i.guild.members.fetch(i.user.id);await i.editReply(await messagePayload(m,kind,v,true));return true;}
  if(action==='test'){await i.deferReply({flags:MessageFlags.Ephemeral});await send(await i.guild.members.fetch(i.user.id),kind,true);await i.editReply('Mensagem de teste enviada ao canal.');return true;}
  let patch;
  if(action==='channel'){const c=await i.guild.channels.fetch(i.values[0]);if(!c||c.guildId!==i.guildId||c.type!==D.ChannelType.GuildText)throw Error('Canal inválido.');patch={channelId:c.id};}
+ else if(action==='role'&&kind==='join'){const id=i.values[0];if(id){const role=await i.guild.roles.fetch(id);if(!role||role.id===i.guildId||role.managed||!role.editable||role.permissions.has(PermissionFlagsBits.Administrator))throw Error('Escolha um cargo atribuível abaixo do Nero e sem permissão de administrador.');}patch={roleId:id||null};}
  else if(action==='toggle')patch={enabled:!v.enabled};
  else if(action==='avatar'||action==='banner')patch={[action]:!v[action]};
  else if(action==='savemessage')patch={title:i.fields.getTextInputValue('title'),message:i.fields.getTextInputValue('message')};
