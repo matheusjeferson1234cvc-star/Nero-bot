@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
-const {commands,dateValue,absenceApproved,config,supportPanel,ticketPanel}=require('../src/nero-modules');
+const {commands,dateValue,absenceApproved,config,supportPanel,ticketPanel,reportPanel,reportEvent,elapsed}=require('../src/nero-modules');
 test('atendimento publica diretamente sem opções slash',()=>{
  const json=commands.map(c=>c.toJSON());
  assert.deepEqual(json.map(c=>c.name),['painelatendimento']);
@@ -30,4 +30,14 @@ test('configuração antiga migra cargo, tickets são temporários e não há tr
  const ticket={id:'abc123',owner:'123456789012345678',assignee:null};
  const open=JSON.stringify(ticketPanel(ticket,cfg).components[0].toJSON());assert.ok(open.includes('n41:claim:abc123'));assert.ok(open.includes('n41:close:abc123'));
  const closed=JSON.stringify(ticketPanel({...ticket,closing:true},cfg).components[0].toJSON());assert.ok(!closed.includes('n41:close:'));
+});
+
+test('relatório V2 reúne ações, tempos e não contém conversa nem assunto',()=>{
+ const t={id:'abc123',owner:'123456789012345678',createdAt:1000,assignee:null,categoryLabel:'Suporte',subject:'SEGREDO'};
+ reportEvent(t,'aberto',t.owner,1000);t.assignee='234567890123456789';reportEvent(t,'claim',t.assignee,61000);reportEvent(t,'release',t.assignee,62000);t.assignee=null;reportEvent(t,'encerrado',t.owner,121000);t.closed=true;t.closedAt=121000;t.closedBy=t.owner;
+ assert.equal(t.firstClaimAt,61000);assert.equal(elapsed(t.createdAt,t.firstClaimAt),'1min 0s');
+ const payload=reportPanel(t),body=JSON.stringify(payload.components[0].toJSON());
+ assert.equal(payload.flags,32768);assert.equal(payload.content,undefined);assert.ok(body.includes('Atendimento assumido'));assert.ok(body.includes('2min 0s'));assert.ok(body.includes('Confirmada'));assert.ok(!body.includes('SEGREDO'));
+ for(let i=0;i<30;i++)reportEvent(t,'claim',t.owner,200000+i);
+ assert.equal(t.history.length,20);assert.equal(t.firstClaimAt,61000);
 });
