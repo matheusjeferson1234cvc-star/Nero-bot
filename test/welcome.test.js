@@ -10,7 +10,7 @@ test('entrada e saída incluem menção, nome e total em texto',async()=>{
  const member={id:'123456789012345678',user:{username:'teste',globalName:'João'},guild:{name:'Nero',memberCount:72}};
  const cfg={title:'Até logo!',message:'{nome} saiu de {servidor}',color:'#dc2626',banner:false,avatar:false};
  const out=await messagePayload(member,'leave',cfg);
- assert.ok(out.content.includes('<@'+member.id+'>'));assert.deepEqual(out.allowedMentions.users,[member.id]);assert.ok(out.embeds[0].toJSON().description.includes('João'));assert.ok(out.embeds[0].toJSON().description.includes('72'));assert.equal(render('{membro}',member,'leave'),'<@'+member.id+'>');
+ const body=JSON.stringify(out.components[0].toJSON());assert.ok(body.includes('<@'+member.id+'>'));assert.deepEqual(out.allowedMentions.users,[member.id]);assert.ok(body.includes('João'));assert.ok(body.includes('72'));assert.equal(out.content,undefined);assert.equal(out.embeds,undefined);assert.equal(out.flags,32768);assert.equal(render('{membro}',member,'leave'),'<@'+member.id+'>');
  const preview=await messagePayload(member,'join',cfg,true);assert.deepEqual(preview.allowedMentions.users,[]);
 });
 test('cartão usa caminhos vetoriais e gera PNG sem depender de fontes do servidor',async()=>{
