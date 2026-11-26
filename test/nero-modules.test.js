@@ -21,3 +21,5 @@ test('reutiliza somente justificativa aprovada do membro e da data',()=>{
  assert.equal(absenceApproved(g,'3',when),false);
  assert.equal(absenceApproved(g,'1',when+86400000),false);
 });
+
+test('notas e média mínima',()=>{const {scoreResult}=require('../src/nero-modules');assert.equal(scoreResult(70,70),'aprovado');assert.equal(scoreResult(69,70),'reprovado');assert.throws(()=>scoreResult(101,70));});

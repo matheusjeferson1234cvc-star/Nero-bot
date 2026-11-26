@@ -13,7 +13,8 @@ async function send(member,kind,test=false){
  if(!cfg.enabled||!cfg.channelId){if(test)throw Error('Ative e configure o canal no site.');return;}
  const channel=await member.guild.channels.fetch(cfg.channelId);
  if(!channel?.isTextBased()||channel.guildId!==member.guild.id||!channel.send)throw Error('Canal inválido.');
- const embed=new EmbedBuilder().setTitle((test?'TESTE • ':'')+(kind==='join'?'👋 Bem-vindo(a)!':'👋 Até logo!')).setDescription(render(cfg.message,member,kind)).setColor(kind==='join'?0x16a34a:0xdc2626).setThumbnail(member.user.displayAvatarURL()).setFooter({text:'Nero • Entrada e saída'}).setTimestamp();
+ const embed=new EmbedBuilder().setTitle((test?'TESTE • ':'')+cfg.title).setDescription(render(cfg.message,member,kind)).setColor(parseInt(cfg.color.slice(1),16)).setFooter({text:'Nero • Entrada e saída'}).setTimestamp();
+ if(cfg.showAvatar)embed.setThumbnail(member.user.displayAvatarURL());if(cfg.imageUrl)embed.setImage(cfg.imageUrl);
  await channel.send({embeds:[embed],allowedMentions:{parse:[]}});
 }
 function install(client){
