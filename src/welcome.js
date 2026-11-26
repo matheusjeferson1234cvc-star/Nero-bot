@@ -9,18 +9,18 @@ function render(template,member,kind){
  return template.replace(/\{(membro|nome|servidor|total)\}/g,(_,k)=>values[k]);
 }
 async function messagePayload(member,kind,cfg,test=false){
- const mention='<@'+member.id+'>';
- const message=render(cfg.message,member,kind);
- const content=((test?'**PRÉVIA • TESTE**\n':'')+(message.includes(mention)?message:mention+' • '+message)).slice(0,2000);
+ const mention='<@'+member.id+'>',message=render(cfg.message,member,kind),join=kind==='join';
  const name=D.escapeMarkdown(String(member.user.globalName||member.user.username)).replaceAll('@','@\u200b');
  const total=Number.isSafeInteger(member.guild.memberCount)?String(member.guild.memberCount):'Indisponível';
- const embed=new EmbedBuilder().setDescription('**Membro:** '+name+'\n**Total de membros:** '+total).setColor(cfg.color);
- const files=[];const embeds=[embed];
- if(!cfg.banner)embed.setTitle(cfg.title);
- if(cfg.banner){try{const card=await require('./welcome-card').welcomeCard(member,kind,cfg);files.push(new AttachmentBuilder(card,{name:'nero-member.png'}));embed.setImage('attachment://nero-member.png');}catch(e){console.warn('[Nero cartão]',e.message);embed.setTitle(cfg.title);if(cfg.avatar)embed.setThumbnail(member.user.displayAvatarURL());}}
- else if(cfg.avatar)embed.setThumbnail(member.user.displayAvatarURL());
- if(cfg.gif&&cfg.banner)embeds.push(new EmbedBuilder().setColor(cfg.color).setImage(cfg.gif));
- return {content,embeds,files,allowedMentions:{parse:[],users:!test?[member.id]:[]}};
+ const title=D.escapeMarkdown(String(cfg.title|| (join?'Bem-vindo(a)!':'Até logo!')).replaceAll('@','@\u200b'));
+ const c=new D.ContainerBuilder().setAccentColor(parseInt(cfg.color.slice(1),16)),files=[];
+ const body=(test?'**👁️ PRÉVIA • TESTE**\n':'')+'## '+(join?'👋 ':'🚪 ')+title+'\n'+(message.includes(mention)?message:mention+' • '+message)+'\n\n**👤 Membro:** '+name+'\n**👥 Total de membros:** '+total;
+ c.addTextDisplayComponents(new D.TextDisplayBuilder().setContent(body));
+ let image;
+ if(cfg.banner){try{const card=await require('./welcome-card').welcomeCard(member,kind,cfg);files.push(new AttachmentBuilder(card,{name:'nero-member.png'}));image='attachment://nero-member.png';}catch(e){console.warn('[Nero cartão]',e.message);}}
+ if(!image&&cfg.avatar)image=member.user.displayAvatarURL({extension:'png',size:256});
+ if(image||cfg.gif&&cfg.banner){c.addSeparatorComponents(new D.SeparatorBuilder().setDivider(true).setSpacing(D.SeparatorSpacingSize.Small));const items=[];if(image)items.push(new D.MediaGalleryItemBuilder().setURL(image).setDescription(join?'Cartão de boas-vindas':'Cartão de saída'));if(cfg.gif&&cfg.banner)items.push(new D.MediaGalleryItemBuilder().setURL(cfg.gif).setDescription('Banner personalizado'));c.addMediaGalleryComponents(new D.MediaGalleryBuilder().addItems(...items));}
+ return {components:[c],files,flags:MessageFlags.IsComponentsV2,allowedMentions:{parse:[],users:!test?[member.id]:[]}};
 }
 async function send(member,kind,test=false){
  const cfg=normalizeWelcome(store.get(member.guild.id).settings.welcome)[kind];
