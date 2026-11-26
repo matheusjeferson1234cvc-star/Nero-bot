@@ -6,7 +6,7 @@ const {
   AttachmentBuilder, ContainerBuilder, TextDisplayBuilder, MediaGalleryBuilder,
   MediaGalleryItemBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
   MessageFlags, StringSelectMenuBuilder, RoleSelectMenuBuilder,
-  ChannelSelectMenuBuilder, ChannelType
+  ChannelSelectMenuBuilder, ChannelType, SeparatorBuilder, SeparatorSpacingSize
 } = require('discord.js');
 const core = require('./core');
 const {formatDateBR}=require('./date-br');
@@ -393,20 +393,37 @@ function notificationsConfig(s){const n=s.notifications;
  '-# Não são enviadas imagens PNG ou arquivos. Se o membro bloquear mensagens privadas, o cartão será encerrado normalmente e o bot registrará o aviso nos logs.',
  [row(button('cfg:notify-dm',n.pointDm?'Desativar mensagens no PV':'Ativar mensagens no PV',ButtonStyle.Secondary,'✉️')),
   row(button('bp:config','Voltar',ButtonStyle.Secondary,'↩️'))],true,'purple')}
-function justificationReview(j){return v2('SOLICITAÇÃO DE JUSTIFICATIVA',
- `**Protocolo:** ${safe(j.id)}\n**Membro:** <@${j.userId}>\n**Turno:** ${shiftLabel(j.shift)}\n`+
- `**Período:** ${(j.dates||[j.date]).map(formatDateBR).join(', ')} (${j.days||1} dia(s))\n**Motivo:** ${safe(j.reason)}\n**Status:** Em análise`,
- [row(button(`justify:approve:${j.id}`,'Aprovar',ButtonStyle.Success),button(`justify:reject:${j.id}`,'Recusar',ButtonStyle.Danger))],false,'amber')}
-function justificationDecisionLog(j){return v2(j.status==='approved'?'JUSTIFICATIVA APROVADA':'JUSTIFICATIVA RECUSADA',
- `**Protocolo:** ${safe(j.id)}\n**Membro:** <@${j.userId}>\n**Turno:** ${shiftLabel(j.shift)}\n`+
- `**Datas da ausência:** ${(j.dates||[j.date]).map(formatDateBR).join(', ')}\n**Motivo informado:** ${safe(j.reason)}\n`+
- `**Analisado por:** <@${j.reviewerId}>\n`+
- `**Resultado:** ${j.status==='approved'?'Falta abonada — sem advertência por este dia.':'Falta não abonada — entra na avaliação de presença.'}`,
- [],false,j.status==='approved'?'green':'red')}
-function justificationDM(j){return new EmbedBuilder().setColor(j.status==='approved'?COLORS.green:j.status==='rejected'?COLORS.red:COLORS.amber)
- .setTitle(j.status==='approved'?'Justificativa aprovada':j.status==='rejected'?'Justificativa recusada':'Justificativa em análise')
- .setDescription(`**Protocolo:** ${safe(j.id)}\n**Datas:** ${(j.dates||[j.date]).map(formatDateBR).join(', ')}\n**Turno:** ${shiftLabel(j.shift)}`)
- .setFooter({text:'CENTRAL DE PONTO · Ausências'}).setTimestamp()}
+function justificationPeriod(j){
+ const raw=Array.isArray(j.dates)&&j.dates.length?j.dates:[j.date];
+ const days=[...new Set(raw.filter(d=>typeof d==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(d)))].sort();
+ const count=days.length||Number(j.days)||1;
+ return {start:formatDateBR(days[0]||j.startDate||j.date),end:formatDateBR(days.at(-1)||j.date||j.startDate),count};
+}
+function justificationCard(j,opts={}){
+ const pending=j.status!=='approved'&&j.status!=='rejected',approved=j.status==='approved',meeting=Boolean(opts.meeting);
+ const tone=pending?'amber':approved?'green':'red',status=pending?'🟡 Em análise':approved?'🟢 Aprovada':'🔴 Recusada';
+ const title=pending?'📋 SOLICITAÇÃO DE JUSTIFICATIVA':approved?'✅ JUSTIFICATIVA APROVADA':'❌ JUSTIFICATIVA RECUSADA';
+ const c=new ContainerBuilder().setAccentColor(accent(tone));
+ const add=v=>c.addTextDisplayComponents(text(v));
+ const line=()=>c.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+ add('## '+title+'\n**Protocolo:** '+safe(j.id)+'\n**Situação:** '+status);
+ line();
+ add('### 👤 Identificação\n**Membro:** <@'+j.userId+'>\n**Tipo:** '+(meeting?'Ausência em reunião':'Ausência no turno')+(opts.guildName?'\n**Servidor:** '+safe(opts.guildName):'')+(meeting?'\n**Reunião:** '+safe(opts.meeting.title):'\n**Turno:** '+shiftLabel(j.shift)));
+ line();
+ if(meeting)add('### 📅 Reunião\n**Data e horário:** '+timestamp(opts.meeting.when));
+ else{const p=justificationPeriod(j);add('### 📅 Período da ausência\n**Início:** '+p.start+'\n**Fim:** '+p.end+'\n**Dias de serviço:** '+p.count+'\n-# Folgas e dias sem serviço não estão incluídos na contagem.');}
+ if(opts.showReason&&j.reason){line();add('### 📝 Motivo informado\n'+safe(j.reason));}
+ line();
+ const reviewer=j.reviewerId||j.reviewer;
+ const result=pending?'Sua solicitação foi recebida e aguarda análise.':approved?(meeting?'Ausência na reunião justificada.':'Ausência abonada nos dias de serviço aprovados.'):(meeting?'A ausência na reunião não foi justificada.':'A ausência não foi abonada; será considerada na avaliação de presença.');
+ add('### 📌 '+(pending?'Acompanhamento':'Resultado')+'\n**Enviada em:** '+timestamp(j.at)+(pending?'':'\n**Analisado por:** '+(reviewer?'<@'+reviewer+'>':'Não informado')+'\n**Analisada em:** '+timestamp(j.decidedAt))+'\n\n'+result+(meeting?'\n-# Não altera faltas nem advertências do turno.':''));
+ if(pending&&opts.rows?.length){line();for(const r of opts.rows)c.addActionRowComponents(r);}
+ add('-# NERO BOT • CENTRAL DE JUSTIFICATIVAS');
+ return {components:[c],flags:MessageFlags.IsComponentsV2,allowedMentions:mentions};
+}
+function justificationReview(j){return justificationCard(j,{showReason:true,rows:[row(button('justify:approve:'+j.id,'Aprovar',ButtonStyle.Success,'✅'),button('justify:reject:'+j.id,'Recusar',ButtonStyle.Danger,'❌'))]});}
+function justificationDecisionLog(j){return justificationCard(j);}
+function justificationDM(j,guildName){return justificationCard(j,{guildName,showReason:true});}
 function pointReceipt(card,member){
  const minutes=core.format(core.durationFor(member,card.endedAt||Date.now()));
  const pauses=(card.history||[]).filter(h=>h.event==='paused').length;
@@ -446,5 +463,5 @@ function warningLog(w){return v2(w.status==='revoked'?'ADVERTÊNCIA REVOGADA':'A
 module.exports = {
   COLORS, safe, mentions, row, button, v2, msg, panel, cardText, logCard, auditLog,
   inviteDM, dmOutcome, select, roleSelect, channelSelect, config, shiftConfig, logsConfig, mandatoryConfig, notificationsConfig,justificationRolesConfig,
-  teamMenu, candidateView, stat,modeConfig,presenceConfig,justificationPanel,justificationConfig,justificationReview,justificationDecisionLog,justificationDM,warningDM,warningLog,pointReceipt,receiptPhotoEmbed,receiptActions
+  teamMenu, candidateView, stat,modeConfig,presenceConfig,justificationPanel,justificationConfig,justificationReview,justificationDecisionLog,justificationDM,justificationCard,justificationPeriod,warningDM,warningLog,pointReceipt,receiptPhotoEmbed,receiptActions
 };
