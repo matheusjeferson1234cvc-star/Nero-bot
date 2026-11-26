@@ -22,7 +22,7 @@ const defaults=[
 ];
 function state(g){g.neroModules??={};const m=g.neroModules;for(const k of ['panels','meetings','courses','tickets'])m[k]??={};m.audit??=[];return m;}
 function config(raw={}){
- return {...raw,title:raw.title||'Central de Atendimento',description:raw.description||'Olá! Seja bem-vindo(a) à nossa central de atendimento.\nSelecione uma opção e aguarde nossa equipe.',rules:raw.rules??'• Aguarde a resposta da equipe.\n• Evite marcações desnecessárias.\n• Não envie senhas ou documentos pessoais.',footer:raw.footer??'Nero Bot • Sistema de Atendimento',color:raw.color||'#DC2626',bannerUrl:raw.bannerUrl||null,iconUrl:raw.iconUrl||null,roleIds:Array.isArray(raw.roleIds)?raw.roleIds:raw.roleId?[raw.roleId]:[],options:Array.isArray(raw.options)&&raw.options.length?raw.options:defaults.map(x=>({...x})),limit:raw.limit??1,deleteDelay:[0,5,10,30].includes(raw.deleteDelay)?raw.deleteDelay:5,mentionStaff:raw.mentionStaff??false,allowClaim:raw.allowClaim??true,allowOwnerClose:raw.allowOwnerClose??false,allowTransfer:raw.allowTransfer??true,opening:raw.opening||'Seu atendimento foi aberto. Aguarde nossa equipe.',logChannelId:raw.logChannelId||null, inactivity:raw.inactivity??0};
+ return {...raw,title:raw.title||'Central de Atendimento',description:raw.description||'Olá! Seja bem-vindo(a) à nossa central de atendimento.\nSelecione uma opção e aguarde nossa equipe.',rules:raw.rules??'• Aguarde a resposta da equipe.\n• Evite marcações desnecessárias.\n• Não envie senhas ou documentos pessoais.',footer:raw.footer??'Nero Bot • Sistema de Atendimento',color:raw.color||'#DC2626',bannerUrl:raw.bannerUrl||null,iconUrl:raw.iconUrl||null,roleIds:Array.isArray(raw.roleIds)?raw.roleIds:raw.roleId?[raw.roleId]:[],options:(Array.isArray(raw.options)&&raw.options.length?raw.options:defaults).map(x=>({...x})),limit:raw.limit??1,deleteDelay:[0,5,10,30].includes(raw.deleteDelay)?raw.deleteDelay:5,mentionStaff:raw.mentionStaff??false,allowClaim:raw.allowClaim??true,allowOwnerClose:raw.allowOwnerClose??false,allowTransfer:raw.allowTransfer??true,requestRating:raw.requestRating??false,opening:raw.opening||'Seu atendimento foi aberto. Aguarde nossa equipe.',logChannelId:raw.logChannelId||null, inactivity:raw.inactivity??0};
 }
 const opt=(c,key)=>c.options.find(o=>o.value===key);
 function save(m,event,actor,ref){m.audit.push({kind:'support',event,actor,ref,at:Date.now()});store.save();}
@@ -70,16 +70,16 @@ function settings(raw,tab='main',selected=null){
   c.addActionRowComponents(row(roleMenu('optionRoles:support:'+o.value,'Cargos específicos ou padrão')));
   c.addActionRowComponents(row(channelMenu('optionChannel:support:'+o.value,'Categoria específica ou padrão',D.ChannelType.GuildCategory)));
  }else if(tab==='general'){
-  c.addTextDisplayComponents(td('**Limite por membro:** '+cfg.limit+'\n**Excluir após:** '+cfg.deleteDelay+'s\n**Inatividade:** '+(cfg.inactivity?cfg.inactivity+' horas':'Desativada')+'\n**Mencionar equipe:** '+(cfg.mentionStaff?'Sim':'Não')+'\n**Assumir ticket:** '+(cfg.allowClaim?'Sim':'Não')+'\n**Solicitante pode fechar:** '+(cfg.allowOwnerClose?'Sim':'Não')+'\n**Transferência:** '+(cfg.allowTransfer?'Sim':'Não')));
+  c.addTextDisplayComponents(td('**Limite por membro:** '+cfg.limit+'\n**Excluir após:** '+cfg.deleteDelay+'s\n**Inatividade:** '+(cfg.inactivity?cfg.inactivity+' horas':'Desativada')+'\n**Mencionar equipe:** '+(cfg.mentionStaff?'Sim':'Não')+'\n**Assumir ticket:** '+(cfg.allowClaim?'Sim':'Não')+'\n**Solicitante pode fechar:** '+(cfg.allowOwnerClose?'Sim':'Não')+'\n**Transferência:** '+(cfg.allowTransfer?'Sim':'Não')+'\n**Avaliação por DM:** '+(cfg.requestRating?'Sim':'Não')));
   c.addActionRowComponents(row(b('editGeneral:support','Limites e tempos'),b('toggleMention:support','Menções'),b('toggleClaim:support','Assumir')));
-  c.addActionRowComponents(row(b('toggleOwner:support','Fechar pelo membro'),b('toggleTransfer:support','Transferência')));
+  c.addActionRowComponents(row(b('toggleOwner:support','Fechar pelo membro'),b('toggleTransfer:support','Transferência'),b('toggleRating:support','Avaliação')));
  }
  if(tab!=='main')c.addActionRowComponents(row(b(tab==='option'?'options:support':'settings:support','Voltar'),b('settingsrefresh:support','Atualizar painel',B.Primary)));
  return payload(c,[],true);
 }
 function modal(key,title,fields){
  const m=new D.ModalBuilder().setCustomId('n41:'+key).setTitle(title);
- for(const [name,label,max,value='',required=true,paragraph=false] of fields){const t=new D.TextInputBuilder().setCustomId(name).setLabel(label).setMaxLength(max).setRequired(required).setStyle(paragraph?D.TextInputStyle.Paragraph:D.TextInputStyle.Short);if(value)t.setValue(String(value));m.addComponents(row(t));}return m;
+ for(const [name,label,max,value='',required=true,paragraph=false] of fields){const t=new D.TextInputBuilder().setCustomId(name).setLabel(label).setMaxLength(max).setRequired(required).setStyle(paragraph?D.TextInputStyle.Paragraph:D.TextInputStyle.Short);if(value!==null&&value!==undefined&&value!=='')t.setValue(String(value));m.addComponents(row(t));}return m;
 }
 function url(v){if(!v)return null;const u=new URL(v);if(u.protocol!=='https:'||u.username||u.password)throw Error('Use um link HTTPS válido.');return v;}
 function integer(v,min,max){if(!/^\d+$/.test(v)||Number(v)<min||Number(v)>max)throw Error('Valor numérico inválido.');return Number(v);}
@@ -108,8 +108,8 @@ async function settingsAction(i,m,action,a){
  else if(action==='settingschannel'){c.categoryId=(await validateChannel(i,i.values[0],D.ChannelType.GuildCategory))?.id||null;tab='channels';}
  else if(action==='settingslog'){const ch=await validateChannel(i,i.values[0],D.ChannelType.GuildText);if(ch&&ch.permissionsFor(i.guild.roles.everyone)?.has(P.ViewChannel))throw Error('Escolha um canal de logs privado.');c.logChannelId=ch?.id||null;tab='channels';}
  else if(action==='saveGeneral'){c.limit=integer(field(i,'limit'),1,5);const delay=integer(field(i,'delay'),0,30);if(![0,5,10,30].includes(delay))throw Error('Escolha 0, 5, 10 ou 30 segundos.');c.deleteDelay=delay;c.inactivity=integer(field(i,'inactivity'),0,168);tab='general';}
- else if(action.startsWith('toggle')){const k={toggleMention:'mentionStaff',toggleClaim:'allowClaim',toggleOwner:'allowOwnerClose',toggleTransfer:'allowTransfer'}[action];if(!k)throw Error('Configuração inválida.');c[k]=!c[k];tab='general';}
- else if(action==='saveOption'){const label=field(i,'label'),emoji=field(i,'emoji'),description=field(i,'description');if(!label)throw Error('Informe um nome.');if(emoji&&!/\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(emoji))throw Error('Use um emoji Unicode, como 🎫.');let o=opt(c,a);if(a==='new'){if(c.options.length>=25)throw Error('Limite de 25 opções.');o={value:id()};c.options.push(o);}if(!o)throw Error('Opção removida.');Object.assign(o,{label,emoji:emoji||null,description});tab='option';selected=o.value;}
+ else if(action.startsWith('toggle')){const k={toggleMention:'mentionStaff',toggleClaim:'allowClaim',toggleOwner:'allowOwnerClose',toggleTransfer:'allowTransfer',toggleRating:'requestRating'}[action];if(!k)throw Error('Configuração inválida.');c[k]=!c[k];tab='general';}
+ else if(action==='saveOption'){const label=field(i,'label'),emoji=field(i,'emoji'),description=field(i,'description');if(!label)throw Error('Informe um nome.');if(emoji&&(!/\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(emoji)||[...new Intl.Segmenter('pt',{granularity:'grapheme'}).segment(emoji)].length!==1))throw Error('Use um emoji Unicode, como 🎫.');let o=opt(c,a);if(a==='new'){if(c.options.length>=25)throw Error('Limite de 25 opções.');o={value:id()};c.options.push(o);}if(!o)throw Error('Opção removida.');Object.assign(o,{label,emoji:emoji||null,description});tab='option';selected=o.value;}
  else if(action==='removeOption'){if(c.options.length<=1)throw Error('Mantenha pelo menos uma opção.');c.options=c.options.filter(o=>o.value!==a);tab='options';}
  else if(action==='optionRoles'||action==='optionChannel'){const o=opt(c,a);if(!o)throw Error('Opção removida.');if(action==='optionRoles')o.roleIds=await validateRoles(i,i.values);else o.categoryId=(await validateChannel(i,i.values[0],D.ChannelType.GuildCategory))?.id||null;tab='option';}
  else throw Error('Configuração inválida.');
@@ -147,7 +147,7 @@ async function deleteDue(guild,m,t,cfg){
  const key=guild.id+':delete:'+t.id;if(locks.has(key))return;locks.add(key);
  try{let ch;try{ch=await guild.channels.fetch(t.channelId);}catch(e){if(e.code!==10003)throw e;}
  if(ch){if(ch.guildId!==guild.id||ch.type!==D.ChannelType.GuildText||ch.id!==t.channelId)throw Error('Canal de ticket inválido.');await ch.delete('Nero: atendimento encerrado');}
- t.closed=true;t.closedAt=Date.now();t.closing=false;delete t.deleteAt;delete t.subject;save(m,'closed',t.closedBy,t.id);await ticketLog(guild,cfg,t,'encerrado',t.closedBy);
+ t.closed=true;t.closedAt=Date.now();t.closing=false;delete t.deleteAt;delete t.subject;save(m,'closed',t.closedBy,t.id);await ticketLog(guild,cfg,t,'encerrado',t.closedBy);if(cfg.requestRating)await sendRating(guild,t);
  }catch(e){t.deleteAt=Date.now()+30000;store.save();console.warn('[Atendimento exclusão; nova tentativa]',e.message);}finally{locks.delete(key);}
 }
 async function cleanup(guild){
@@ -157,9 +157,21 @@ async function cleanup(guild){
  else if(!t.closing&&cfg.inactivity&&Date.now()-(t.lastActivityAt||t.createdAt)>=cfg.inactivity*3600000)await beginClose(guild,m,t,cfg,null);
  }
 }
+
+async function sendRating(guild,t){
+ try{const user=await guild.client.users.fetch(t.owner);await user.send({content:'Como foi seu atendimento no servidor '+safe(guild.name)+'? Avalie de 1 a 5. Não inclua dados pessoais.',components:[row(...[1,2,3,4,5].map(n=>new D.ButtonBuilder().setCustomId('nrate:'+guild.id+':'+t.id+':'+n).setLabel(String(n)).setStyle(B.Secondary)))],allowedMentions:mentions});}catch(e){console.warn('[Atendimento avaliação]',e.message);}
+}
+async function handleRating(i){
+ const [,guildId,ticketId,value]=i.customId.split(':');const guild=i.client.guilds.cache.get(guildId);const rating=Number(value);
+ if(!guild||!Number.isInteger(rating)||rating<1||rating>5){await i.reply({content:'Avaliação indisponível.'});return;}
+ const m=state(store.get(guildId)),t=m.tickets[ticketId];
+ if(!t?.closed||t.owner!==i.user.id||t.rating){await i.reply({content:'Avaliação indisponível ou já registrada.'});return;}
+ t.rating=rating;save(m,'rated',i.user.id,t.id);await i.update({content:'Obrigado pela avaliação: '+rating+'/5.',components:[]});await ticketLog(guild,config(m.panels.support),t,'avaliado ('+rating+'/5)',i.user.id);
+}
+
 function install(client){
  client.on(D.Events.MessageCreate,msg=>{if(!msg.guild||msg.author.bot)return;const m=state(store.get(msg.guild.id)),t=Object.values(m.tickets).find(t=>t.channelId===msg.channelId&&!t.closed&&!t.closing);if(t){t.lastActivityAt=Date.now();store.save();}});
- const sweep=async()=>{for(const guild of client.guilds.cache.values())try{await cleanup(guild);}catch(e){console.warn('[Atendimento manutenção]',e.message);}};
+ let sweeping=false;const sweep=async()=>{if(sweeping)return;sweeping=true;try{for(const guild of client.guilds.cache.values())try{await cleanup(guild);}catch(e){console.warn('[Atendimento manutenção]',e.message);}}finally{sweeping=false;}};
  client.once(D.Events.ClientReady,()=>{sweep().catch(console.warn);setInterval(()=>sweep().catch(console.warn),1000).unref();});
 }
 async function handle(i){
@@ -175,6 +187,7 @@ async function handle(i){
  }
  if(!['claim','release','transfer','transferTo','close','confirmClose','cancelClose'].includes(action))throw Error('Sistema antigo desativado. Use os painéis atuais.');
  const t=m.tickets[k],cfg=config(m.panels.support);if(!t||t.closed||t.closing||t.channelId!==i.channelId)throw Error('Atendimento indisponível.');
+ if(!t.messageId&&i.message?.author.id===i.client.user.id&&['claim','close'].includes(action)){t.messageId=i.message.id;store.save();}
  if(action==='close'){if(!mayClose(i,t,cfg))throw Error('Sem permissão para fechar.');await i.reply({content:'Confirma o encerramento? O canal será apagado'+(cfg.deleteDelay?' após '+cfg.deleteDelay+' segundos':' imediatamente')+'. A conversa não será arquivada pelo Nero.',components:[row(b('confirmClose:'+t.id+':'+i.user.id,'Confirmar',B.Danger),b('cancelClose:'+t.id+':'+i.user.id,'Cancelar'))],flags:E});return true;}
  if(action==='confirmClose'||action==='cancelClose'){if(a!==i.user.id||!mayClose(i,t,cfg))throw Error('Confirmação inválida.');if(action==='cancelClose'){await i.update({content:'Encerramento cancelado.',components:[]});return true;}
  await i.update({content:'Ticket encerrado. O canal será excluído.',components:[]});if(await beginClose(i.guild,m,t,cfg,i.user.id)&&cfg.deleteDelay===0)await deleteDue(i.guild,m,t,cfg);return true;}
@@ -190,4 +203,4 @@ async function handle(i){
 }
 function dateValue(v){if(!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(v))throw Error('Use AAAA-MM-DD HH:MM (Brasília).');const t=Date.parse(v.replace(' ','T')+':00-03:00');if(!Number.isFinite(t)||new Date(t-10800000).toISOString().slice(0,16).replace('T',' ')!==v||t<=Date.now())throw Error('Data futura inválida.');return t;}
 function absenceApproved(g,user,when){const day=attendance.localDay(when,g.settings.timezone||'America/Sao_Paulo');return Object.values(g.justifications||{}).some(j=>j.userId===user&&j.status==='approved'&&(j.date===day||j.dates?.includes(day)));}
-module.exports={commands,handle,install,dateValue,absenceApproved,config,supportPanel,ticketPanel};
+module.exports={commands,handle,handleRating,install,dateValue,absenceApproved,config,supportPanel,ticketPanel};
