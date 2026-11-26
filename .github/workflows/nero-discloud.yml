@@ -4,6 +4,7 @@ on:
     branches:
       - main
       - feature/nero-v41-modulos
+      - feature/nero-v42-boasvindas
       - feat/presenca-sem-hora-extra-20261122
       - feat/v4-logs-bate-ponto-automativo
   workflow_dispatch:
@@ -25,17 +26,17 @@ jobs:
         run: |
           npm run check
           node --check src/nero-modules.js
-          node --test test/nero-modules.test.js
+          node --test test/nero-modules.test.js test/welcome.test.js
           python3 -m pip install pillow
           python3 -c "from PIL import Image; from pathlib import Path; files=[Path('assets') / ('nero-'+k+'.gif') for k in ('meeting','support','course')]; images=[Image.open(p) for p in files]; assert all(i.n_frames == 16 for i in images); [(i.seek(f), i.load()) for i in images for f in range(i.n_frames)]"
           node --test tests/core.test.js tests/attendance.test.js tests/presence-reports.test.js tests/ui.test.js tests/log-setup.test.js tests/invite-inbox.test.js tests/web-config.test.js tests/panel-sync.test.js tests/receipt-dm.test.js tests/receipt.test.js tests/warnings.test.js tests/date-br.test.js
       - name: Montar ZIP da Discloud
         run: |
-          zip -q -r Nero-Discloud-v4.1.0.zip index.js discloud.config package.json src assets NERO-V41-MODULOS.md
-          unzip -l Nero-Discloud-v4.1.0.zip | head -25
+          zip -q -r Nero-Discloud-v4.2.0.zip index.js discloud.config package.json src assets NERO-V41-MODULOS.md
+          unzip -l Nero-Discloud-v4.2.0.zip | head -25
       - name: Publicar pacote
         uses: actions/upload-artifact@v4
         with:
-          name: Nero-Discloud-v4.1.0
-          path: Nero-Discloud-v4.1.0.zip
+          name: Nero-Discloud-v4.2.0
+          path: Nero-Discloud-v4.2.0.zip
           retention-days: 30
