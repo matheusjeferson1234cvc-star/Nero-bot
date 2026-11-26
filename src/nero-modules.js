@@ -171,18 +171,18 @@ async function ticket(i,m,category){
  const t={id:id(),owner:i.user.id,roleIds:roles,roleId:roles[0],createdAt:Date.now(),lastActivityAt:Date.now(),subject,category:category||null,categoryLabel:o?.label||'Geral',closed:false,assignee:null};
  const access=[P.ViewChannel,P.SendMessages,P.ReadMessageHistory];const ch=await i.guild.channels.create({name:'atendimento-'+t.id.slice(0,8),type:D.ChannelType.GuildText,parent,permissionOverwrites:[{id:i.guild.id,deny:[P.ViewChannel]},{id:t.owner,allow:access},...roles.map(id=>({id,allow:access})),{id:i.client.user.id,allow:[...access,P.ManageChannels,P.ManageRoles]}]});
  t.channelId=ch.id;try{const msg=await ch.send(ticketPanel(t,cfg));t.messageId=msg.id;if(cfg.mentionStaff)await ch.send({content:roles.map(r=>'<@&'+r+'>').join(' '),allowedMentions:{parse:[],roles}}).catch(()=>{});}catch(e){await ch.delete().catch(()=>{});throw e;}
- m.tickets[t.id]=t;save(m,'opened',i.user.id,t.id);await ticketLog(i.guild,cfg,t,'aberto',i.user.id);return reply(i,'Atendimento aberto: <#'+ch.id+'>.');
+ m.tickets[t.id]=t;reportEvent(t,'aberto',i.user.id,t.createdAt);save(m,'opened',i.user.id,t.id);await syncTicketReport(i.guild,cfg,t);return reply(i,'Atendimento aberto: <#'+ch.id+'>.');
  }finally{locks.delete(key);}
 }
 async function beginClose(guild,m,t,cfg,actor){
- if(t.closed||t.closing)return false;t.closing=true;t.closeRequestedAt=Date.now();t.deleteAt=t.closeRequestedAt+cfg.deleteDelay*1000;t.closedBy=actor||null;delete t.subject;save(m,'closing',actor,t.id);
- await refreshTicket(guild,t,cfg);await ticketLog(guild,cfg,t,'encerrando',actor);return true;
+ if(t.closed||t.closing)return false;t.closing=true;t.closeRequestedAt=Date.now();t.deleteAt=t.closeRequestedAt+cfg.deleteDelay*1000;t.closedBy=actor||null;delete t.subject;reportEvent(t,'encerrando',actor,t.closeRequestedAt);save(m,'closing',actor,t.id);
+ await refreshTicket(guild,t,cfg);await syncTicketReport(guild,cfg,t);return true;
 }
 async function deleteDue(guild,m,t,cfg){
  const key=guild.id+':delete:'+t.id;if(locks.has(key))return;locks.add(key);
  try{let ch;try{ch=await guild.channels.fetch(t.channelId);}catch(e){if(e.code!==10003)throw e;}
  if(ch){if(ch.guildId!==guild.id||ch.type!==D.ChannelType.GuildText||ch.id!==t.channelId)throw Error('Canal de ticket inválido.');await ch.delete('Nero: atendimento encerrado');}
- t.closed=true;t.closedAt=Date.now();t.closing=false;delete t.deleteAt;delete t.subject;save(m,'closed',t.closedBy,t.id);await ticketLog(guild,cfg,t,'encerrado',t.closedBy);if(cfg.requestRating)await sendRating(guild,t);
+ t.closed=true;t.closedAt=Date.now();t.closing=false;delete t.deleteAt;delete t.subject;reportEvent(t,'encerrado',t.closedBy,t.closedAt);save(m,'closed',t.closedBy,t.id);await syncTicketReport(guild,cfg,t);if(cfg.requestRating)await sendRating(guild,t);
  }catch(e){t.deleteAt=Date.now()+30000;store.save();console.warn('[Atendimento exclusão; nova tentativa]',e.message);}finally{locks.delete(key);}
 }
 async function cleanup(guild){
@@ -233,7 +233,7 @@ async function handle(i){
  else if(action==='release'){if(t.assignee!==i.user.id&&!admin(i))throw Error('Somente o responsável pode liberar.');t.assignee=null;}
  else if(action==='transferTo'){if(!cfg.allowTransfer||!t.assignee||t.assignee!==i.user.id&&!admin(i))throw Error('Transferência indisponível.');const member=await i.guild.members.fetch(i.values[0]);if(t.closing||t.closed)throw Error('Ticket encerrado.');if(member.user.bot||!(member.permissions.has(P.Administrator)||(t.roleIds||[t.roleId]).some(r=>member.roles.cache.has(r))))throw Error('Escolha um atendente autorizado.');t.assignee=member.id;}
  else throw Error('Ação inválida.');
- t.lastActivityAt=Date.now();save(m,action,i.user.id,t.id);await refreshTicket(i.guild,t,cfg);await ticketLog(i.guild,cfg,t,action,i.user.id);await reply(i,'Atendimento atualizado.');return true;
+ t.lastActivityAt=Date.now();reportEvent(t,action,i.user.id,t.lastActivityAt);save(m,action,i.user.id,t.id);await refreshTicket(i.guild,t,cfg);await syncTicketReport(i.guild,cfg,t);await reply(i,'Atendimento atualizado.');return true;
  }catch(e){console.warn('[Nero atendimento]',e.message);try{if(i.replied||i.deferred)await i.followUp({content:'⚠️ '+e.message,flags:E});else await reply(i,'⚠️ '+e.message);}catch{}return true;}
 }
 function dateValue(v){if(!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(v))throw Error('Use AAAA-MM-DD HH:MM (Brasília).');const t=Date.parse(v.replace(' ','T')+':00-03:00');if(!Number.isFinite(t)||new Date(t-10800000).toISOString().slice(0,16).replace('T',' ')!==v||t<=Date.now())throw Error('Data futura inválida.');return t;}
