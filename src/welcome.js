@@ -48,10 +48,10 @@ async function handle(i){
  if(!slash&&!custom.startsWith('wel:'))return false;
  if(!i.memberPermissions?.has(PermissionFlagsBits.Administrator)){await i.reply({content:'Somente administradores.',flags:MessageFlags.Ephemeral});return true;}
  try{const g=store.get(i.guildId);if(slash){await i.reply(panel(g));return true;}
- const [,action,kind]=custom.split(':');if(action==='back'){await i.update(panel(g));return true;}
+ const [,action,kind]=custom.split(':');if(action==='back'){await i.update({...panel(g),flags:MessageFlags.IsComponentsV2});return true;}
  if(!['join','leave'].includes(kind))throw Error('Sistema inválido.');
  const v=normalizeWelcome(g.settings.welcome)[kind];
- if(action==='open'){await i.update(panel(g,kind));return true;}
+ if(action==='open'){await i.update({...panel(g,kind),flags:MessageFlags.IsComponentsV2});return true;}
  if(action==='message'||action==='visual'){await i.showModal(modal(kind,action,v));return true;}
  if(action==='preview'){const m=await i.guild.members.fetch(i.user.id);const embed=new EmbedBuilder().setTitle(v.title).setDescription(render(v.message,m,kind)).setColor(v.color);const files=[];if(v.avatar)embed.setThumbnail(m.user.displayAvatarURL());if(v.banner){if(v.gif)embed.setImage(v.gif);else{const name='nero-'+kind+'.gif';files.push(new AttachmentBuilder(require('node:path').join(__dirname,'..','assets',name),{name}));embed.setImage('attachment://'+name);}}await i.reply({embeds:[embed],files,flags:MessageFlags.Ephemeral,allowedMentions:{parse:[]}});return true;}
  if(action==='test'){await i.deferReply({flags:MessageFlags.Ephemeral});await send(await i.guild.members.fetch(i.user.id),kind,true);await i.editReply('Mensagem de teste enviada ao canal.');return true;}
@@ -63,7 +63,7 @@ async function handle(i){
  else if(action==='savevisual')patch={color:i.fields.getTextInputValue('color'),gif:i.fields.getTextInputValue('gif')||null};
  else throw Error('Ação inválida.');
  save(g,kind,patch,i.client);
- if(i.isModalSubmit())await i.reply(panel(g,kind));else await i.update(panel(g,kind));
+ if(i.isModalSubmit())await i.reply(panel(g,kind));else await i.update({...panel(g,kind),flags:MessageFlags.IsComponentsV2});
  }catch(e){if(i.deferred)await i.editReply('⚠️ '+e.message);else if(!i.replied)await i.reply({content:'⚠️ '+e.message,flags:MessageFlags.Ephemeral});}
  return true;
 }
