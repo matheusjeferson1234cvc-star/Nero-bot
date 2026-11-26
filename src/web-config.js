@@ -10,7 +10,7 @@ function apply(g,raw,revision){
  const source=keepLogs?{...raw,auditChannelId:current.auditChannelId,presenceLogChannelId:current.presenceLogChannelId,
   shifts:Object.fromEntries(schema.SHIFTS.map(k=>[k,{...raw.shifts[k],logChannelId:current.shifts[k].logChannelId}]))}:raw;
  // Sites antigos ainda não enviam os campos de presença: preservar a escolha feita no Discord.
- const cfg=schema.normalize({...source,mandatoryMinutes:source.mandatoryMinutes===undefined?current.mandatoryMinutes:source.mandatoryMinutes,presenceLogChannelId:source.presenceLogChannelId===undefined?current.presenceLogChannelId:source.presenceLogChannelId,
+ const cfg=schema.normalize({...source,welcome:source.welcome??current.welcome,mandatoryMinutes:source.mandatoryMinutes===undefined?current.mandatoryMinutes:source.mandatoryMinutes,presenceLogChannelId:source.presenceLogChannelId===undefined?current.presenceLogChannelId:source.presenceLogChannelId,
   presenceReportsEnabled:source.presenceReportsEnabled===undefined?current.presenceReportsEnabled:source.presenceReportsEnabled});
  const changed=JSON.stringify(cfg)!==JSON.stringify(current);
  if(changed){
