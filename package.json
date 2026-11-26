@@ -1,7 +1,7 @@
 {
   "name": "central-de-ponto-equipes-rp",
-  "version": "4.5.1",
-  "description": "Nero Bot V4.5.1 — formulário de reunião atualizado",
+  "version": "4.5.2",
+  "description": "Nero Bot V4.5.2 — avisos de reuniões e atendimento temporário",
   "private": true,
   "main": "index.js",
   "type": "commonjs",
