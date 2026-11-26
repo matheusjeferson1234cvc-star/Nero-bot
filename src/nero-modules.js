@@ -124,7 +124,42 @@ function ticketPanel(t,cfg){
 }
 const staff=(i,t)=>admin(i)||(t.roleIds||[t.roleId]).some(r=>i.member?.roles?.cache?.has(r));
 const mayClose=(i,t,cfg)=>staff(i,t)||cfg.allowOwnerClose&&i.user.id===t.owner;
-async function ticketLog(guild,cfg,t,event,actor){if(!cfg.logChannelId)return;try{const ch=await guild.channels.fetch(cfg.logChannelId);if(ch?.guildId!==guild.id||!ch.send||ch.permissionsFor(guild.roles.everyone)?.has(P.ViewChannel))return;await ch.send({content:'**Ticket '+event+'** • #'+t.id.slice(0,8)+'\nSolicitante: <@'+t.owner+'>\nResponsável: '+(t.assignee?'<@'+t.assignee+'>':'—')+(actor?'\nAção por: <@'+actor+'>':''),allowedMentions:mentions});}catch(e){console.warn('[Atendimento logs]',e.message);}}
+const reportEvents={aberto:'🎫 Ticket aberto',claim:'🙋 Atendimento assumido',release:'🔄 Atendimento liberado',transferTo:'🔁 Responsável transferido',encerrando:'🔒 Encerramento solicitado',encerrado:'✅ Ticket encerrado'};
+const timestamp=ms=>Number.isFinite(ms)&&ms>0?'<t:'+Math.floor(ms/1000)+':f>':'—';
+function elapsed(from,to){if(!Number.isFinite(from)||!Number.isFinite(to)||to<from)return '—';const s=Math.floor((to-from)/1000),h=Math.floor(s/3600),m=Math.floor(s%3600/60);return (h?h+'h ':'')+m+'min '+s%60+'s';}
+function reportEvent(t,event,actor,now=Date.now()){
+ t.history??=[];const label=reportEvents[event]||(event.startsWith('avaliado')?'⭐ Avaliação recebida':'Atualização');
+ if(event==='claim'&&!t.firstClaimAt)t.firstClaimAt=now;
+ t.history.push({label,actor:actor||null,at:now,assignee:t.assignee||null});
+ t.history=t.history.slice(-20);t.eventCount=(t.eventCount||0)+1;
+}
+function reportPanel(t){
+ const end=t.closeRequestedAt||t.closedAt||Date.now(),status=t.closed?'✅ Encerrado':t.closing?'🔒 Encerrando':t.assignee?'🟡 Em atendimento':'🟢 Aguardando';
+ const c=new D.ContainerBuilder().setAccentColor(t.closed?0x22c55e:t.closing?0xdc2626:t.assignee?0xf59e0b:0x5865f2);
+ c.addTextDisplayComponents(td('## 📋 NERO | RELATÓRIO DE ATENDIMENTO\n**Ticket:** #'+t.id.slice(0,8)+'\n**Status:** '+status));
+ c.addSeparatorComponents(sep()).addTextDisplayComponents(td('### 👥 Informações\n**Solicitante:** <@'+t.owner+'>\n**Categoria:** '+safe(t.categoryLabel||t.category||'Geral')+'\n**Responsável:** '+(t.assignee?'<@'+t.assignee+'>':'Não atribuído')+'\n**Encerrado por:** '+(t.closedBy?'<@'+t.closedBy+'>':t.closing||t.closed?'Automático / não registrado':'—')));
+ c.addSeparatorComponents(sep()).addTextDisplayComponents(td('### ⏱️ Tempos\n**Abertura:** '+timestamp(t.createdAt)+'\n**Primeiro atendimento:** '+timestamp(t.firstClaimAt)+'\n**Tempo de espera:** '+elapsed(t.createdAt,t.firstClaimAt)+'\n**Duração total'+(t.closing||t.closed?'':' até agora')+':** '+elapsed(t.createdAt,end)+'\n**Encerramento:** '+timestamp(t.closeRequestedAt||t.closedAt)+'\n**Exclusão do canal:** '+(t.closed?'Confirmada':t.closing?'Pendente':'—')+'\n**Avaliação:** '+(t.rating?'⭐ '+t.rating+'/5':'Não avaliado')));
+ const list=(t.history||[]).slice(-10).map(e=>'<t:'+Math.floor(e.at/1000)+':t> • '+e.label+(e.actor?' — <@'+e.actor+'>':' — Automático')+(e.label===reportEvents.transferTo&&e.assignee?' → <@'+e.assignee+'>':''));
+ c.addSeparatorComponents(sep()).addTextDisplayComponents(td('### 🗂️ Histórico de ações'+((t.eventCount||0)>10?' (últimas 10)':'')+'\n'+(list.join('\n')||'Nenhuma ação registrada nesta versão.')+'\n\n-# Apenas metadados; conteúdo da conversa não é arquivado.'));
+ return payload(c);
+}
+const reportLocks=new Map();
+async function syncTicketReport(guild,cfg,t){
+ if(!cfg.logChannelId)return;
+ const key=guild.id+':'+t.id,prior=reportLocks.get(key)||Promise.resolve();
+ const task=prior.catch(()=>{}).then(async()=>{
+  try{
+   const ch=await guild.channels.fetch(cfg.logChannelId);
+   if(ch?.guildId!==guild.id||!ch.send||ch.permissionsFor(guild.roles.everyone)?.has(P.ViewChannel))return;
+   const previous=t.reportChannelId===ch.id&&t.reportMessageId?await ch.messages.fetch(t.reportMessageId).catch(e=>{if(e.code===10008)return null;throw e;}):null;
+   if(previous?.author.id===guild.client.user.id){await previous.edit(reportPanel(t));return;}
+   const msg=await ch.send(reportPanel(t));t.reportChannelId=ch.id;t.reportMessageId=msg.id;store.save();
+  }catch(e){console.warn('[Atendimento relatório]',e.message);}
+ });
+ reportLocks.set(key,task);try{await task;}finally{if(reportLocks.get(key)===task)reportLocks.delete(key);}
+}
+async function ticketLog(guild,cfg,t,event,actor){reportEvent(t,event,actor);store.save();await syncTicketReport(guild,cfg,t);}
+
 async function refreshTicket(guild,t,cfg){if(!t.messageId)return;try{const ch=await guild.channels.fetch(t.channelId),msg=await ch.messages.fetch(t.messageId);if(msg.author.id===guild.client.user.id)await msg.edit({...ticketPanel(t,cfg),attachments:[]});}catch(e){console.warn('[Atendimento painel]',e.message);}}
 async function ticket(i,m,category){
  await defer(i);const cfg=config(m.panels.support),o=category?opt(cfg,category):null;if(category&&!o)throw Error('Opção removida. Abra novamente o painel.');
@@ -140,8 +175,8 @@ async function ticket(i,m,category){
  }finally{locks.delete(key);}
 }
 async function beginClose(guild,m,t,cfg,actor){
- if(t.closed||t.closing)return false;t.closing=true;t.deleteAt=Date.now()+cfg.deleteDelay*1000;t.closedBy=actor||null;delete t.subject;save(m,'closing',actor,t.id);
- await refreshTicket(guild,t,cfg);return true;
+ if(t.closed||t.closing)return false;t.closing=true;t.closeRequestedAt=Date.now();t.deleteAt=t.closeRequestedAt+cfg.deleteDelay*1000;t.closedBy=actor||null;delete t.subject;save(m,'closing',actor,t.id);
+ await refreshTicket(guild,t,cfg);await ticketLog(guild,cfg,t,'encerrando',actor);return true;
 }
 async function deleteDue(guild,m,t,cfg){
  const key=guild.id+':delete:'+t.id;if(locks.has(key))return;locks.add(key);
@@ -203,4 +238,4 @@ async function handle(i){
 }
 function dateValue(v){if(!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(v))throw Error('Use AAAA-MM-DD HH:MM (Brasília).');const t=Date.parse(v.replace(' ','T')+':00-03:00');if(!Number.isFinite(t)||new Date(t-10800000).toISOString().slice(0,16).replace('T',' ')!==v||t<=Date.now())throw Error('Data futura inválida.');return t;}
 function absenceApproved(g,user,when){const day=attendance.localDay(when,g.settings.timezone||'America/Sao_Paulo');return Object.values(g.justifications||{}).some(j=>j.userId===user&&j.status==='approved'&&(j.date===day||j.dates?.includes(day)));}
-module.exports={commands,handle,handleRating,install,dateValue,absenceApproved,config,supportPanel,ticketPanel};
+module.exports={commands,handle,handleRating,install,dateValue,absenceApproved,config,supportPanel,ticketPanel,reportPanel,reportEvent,elapsed};
