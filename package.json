@@ -1,7 +1,7 @@
 {
   "name": "central-de-ponto-equipes-rp",
-  "version": "4.5.2",
-  "description": "Nero Bot V4.5.2 — avisos de reuniões e atendimento temporário",
+  "version": "4.5.3",
+  "description": "Nero Bot V4.5.3 — correção dos cartões de entrada e saída",
   "private": true,
   "main": "index.js",
   "type": "commonjs",
@@ -17,6 +17,8 @@
   "dependencies": {
     "discord.js": "14.26.5",
     "dotenv": "^16.6.1",
-    "sharp": "^0.34.1"
+    "sharp": "^0.34.1",
+    "@fontsource/noto-sans": "5.2.7",
+    "opentype.js": "1.3.4"
   }
 }
