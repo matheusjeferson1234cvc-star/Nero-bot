@@ -84,7 +84,7 @@ function modulesSnapshot(g){
   for(const u of x.roster||[]){if(Object.hasOwn(x.present||{},u))present.push(u);else if(x.justifications?.[u]?.status==='approved')justified.push(u);else if(x.justifications?.[u]?.status==='pending')pending.push(u);else if(x.status==='closed')absent.push(u);}
   return {id:x.id,title:x.title,status:x.status,when:x.when,convoked:x.roster?.length??null,present,absent,justified,pending};
  });
- const courses=[]; // Módulo temporariamente desativado; dados locais preservados.
+ const courses=[]; // Histórico local preservado.
  const tickets=Object.values(g.neroModules?.tickets||{}).sort(byRecent).slice(0,100).map(x=>({id:x.id,createdAt:x.createdAt,closed:x.closed,closedAt:x.closedAt||null,assigned:!!x.assignee}));
  return {meetings,courses,tickets};
 }
