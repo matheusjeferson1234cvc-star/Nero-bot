@@ -12,7 +12,9 @@ function apply(g,raw,revision){
  // Sites antigos ainda não enviam os campos de presença: preservar a escolha feita no Discord.
  const keepWelcome=Number.isInteger(g.welcomeEditedRevision)&&(!Number.isInteger(revision)||revision<=g.welcomeEditedRevision);
  if(!keepWelcome)delete g.welcomeEditedRevision;
- const cfg=schema.normalize({...source,welcome:keepWelcome?current.welcome:source.welcome??current.welcome,mandatoryMinutes:source.mandatoryMinutes===undefined?current.mandatoryMinutes:source.mandatoryMinutes,presenceLogChannelId:source.presenceLogChannelId===undefined?current.presenceLogChannelId:source.presenceLogChannelId,
+ const incomingWelcome=source.welcome;
+ const mergedWelcome=keepWelcome||!incomingWelcome?current.welcome:{...incomingWelcome,join:{...incomingWelcome.join,roleId:incomingWelcome.join?.roleId===undefined?current.welcome.join.roleId:incomingWelcome.join.roleId}};
+ const cfg=schema.normalize({...source,welcome:mergedWelcome,mandatoryMinutes:source.mandatoryMinutes===undefined?current.mandatoryMinutes:source.mandatoryMinutes,presenceLogChannelId:source.presenceLogChannelId===undefined?current.presenceLogChannelId:source.presenceLogChannelId,
   presenceReportsEnabled:source.presenceReportsEnabled===undefined?current.presenceReportsEnabled:source.presenceReportsEnabled});
  const changed=JSON.stringify(cfg)!==JSON.stringify(current);
  if(changed){
