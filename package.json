@@ -1,7 +1,7 @@
 {
   "name": "central-de-ponto-equipes-rp",
-  "version": "4.0.0",
-  "description": "Nero Bot V4 — horas obrigatórias globais, encerramento automático e logs com emojis",
+  "version": "4.5.1",
+  "description": "Nero Bot V4.5.1 — formulário de reunião atualizado",
   "private": true,
   "main": "index.js",
   "type": "commonjs",
