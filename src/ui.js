@@ -352,13 +352,11 @@ function justificationPanel(ephemeral=false,visual=null){
     new MediaGalleryItemBuilder().setURL(gif||`attachment://${banner}`)
       .setDescription('CENTRAL DE HORAS — JUSTIFICATIVAS')
   ));
-  c.addTextDisplayComponents(text(`## ${title}`));
-  c.addTextDisplayComponents(text(description));
-  c.addTextDisplayComponents(text(
-    'Escolha **falta no turno** ou **falta em reunião**. Para o turno, informe data inicial e dias de serviço; para reunião, selecione a convocação. A equipe analisa a solicitação. '+
-    'Justificativas de reunião não alteram faltas nem advertências do turno.\n\n'+
-    '-# Evite incluir dados médicos ou outras informações sensíveis.'
-  ));
+  c.addTextDisplayComponents(text('## 📋 '+title+'\n'+description));
+  c.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+  c.addTextDisplayComponents(text('### 🕒 Falta no turno\nInforme a data inicial, a quantidade de dias de serviço e o motivo.\n\n### 📅 Falta em reunião\nSelecione a convocação e informe o motivo. Não altera faltas ou advertências do turno.'));
+  c.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+  c.addTextDisplayComponents(text('### 📩 Acompanhe sua solicitação\nVocê receberá o protocolo e a decisão no privado.\n-# Não inclua dados médicos ou outras informações sensíveis.'));
   c.addActionRowComponents(row(button('just:open','Justificar ausência',ButtonStyle.Primary,'📝'),button('just:config','Configurações',ButtonStyle.Secondary,'⚙️')));
   c.addTextDisplayComponents(text('-# CENTRAL DE PONTO • JUSTIFICATIVAS'));
   return {components:[c],flags:MessageFlags.IsComponentsV2|(ephemeral?MessageFlags.Ephemeral:0),allowedMentions:mentions,
@@ -415,7 +413,7 @@ function justificationCard(j,opts={}){
  if(opts.showReason&&j.reason){line();add('### 📝 Motivo informado\n'+safe(j.reason));}
  line();
  const reviewer=j.reviewerId||j.reviewer;
- const result=pending?'Sua solicitação foi recebida e aguarda análise.':approved?(meeting?'Ausência na reunião justificada.':'Ausência abonada nos dias de serviço aprovados.'):(meeting?'A ausência na reunião não foi justificada.':'A ausência não foi abonada; será considerada na avaliação de presença.');
+ const result=pending?'Sua solicitação foi recebida e aguarda análise.':approved?(meeting?'Ausência na reunião justificada.':'Falta abonada nos dias de serviço aprovados.'):(meeting?'A ausência na reunião não foi justificada.':'Falta não abonada; será considerada na avaliação de presença.');
  add('### 📌 '+(pending?'Acompanhamento':'Resultado')+'\n**Enviada em:** '+timestamp(j.at)+(pending?'':'\n**Analisado por:** '+(reviewer?'<@'+reviewer+'>':'Não informado')+'\n**Analisada em:** '+timestamp(j.decidedAt))+'\n\n'+result+(meeting?'\n-# Não altera faltas nem advertências do turno.':''));
  if(pending&&opts.rows?.length){line();for(const r of opts.rows)c.addActionRowComponents(r);}
  add('-# NERO BOT • CENTRAL DE JUSTIFICATIVAS');
